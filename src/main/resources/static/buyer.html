@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Buyer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="header">Toptri Chat - Buyer</div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="title">Buyer</div>
+
+      <div class="row" style="margin-top:10px">
+        <input id="buyerInput" placeholder="contoh: nasi padang" style="flex:1"/>
+        <button id="buyerSend">Send</button>
+      </div>
+
+      <div class="small" style="margin-top:10px">
+        Request ID: <span id="rid" style="font-weight:800">-</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="buyerChat" class="chat">
+        <div class="bubble right" style="opacity:.85">Ketik request kamu di atas 👆</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/buyer.js"></script>
+</body>
+</html>

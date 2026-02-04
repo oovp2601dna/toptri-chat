@@ -1,0 +1,210 @@
+/* ===== Base ===== */
+:root{
+  --bg: #eef2ff;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+
+  /* ganti header warna di sini */
+  --header: #6b5cff;      /* sebelumnya #3b82f6 */
+  --primary: #16a34a;     /* tombol buy/primary */
+  --secondary: #3b82f6;   /* tombol secondary */
+  --border: #e5e7eb;
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ===== Header ===== */
+.header{
+  background: var(--header);
+  color:#ffb35c;
+  padding:14px 18px;
+  font-weight:800;
+  letter-spacing:.2px;
+}
+
+/* ===== Layout ===== */
+.wrap{
+  max-width: 980px;
+  margin: 26px auto;
+  padding: 0 16px;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  
+
+  justify-items: center; /* bikin cardnya center di grid cell */
+  align-items: start;
+}
+
+/* Mobile: 1 kolom */
+@media (max-width: 860px){
+  .wrap{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Card ===== */
+.card{
+  width: 100%;
+  max-width: 460px;        /* card jadi “box” yang center */
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+  border: 1px solid rgba(15, 23, 42, .06);
+}
+
+.title{
+  font-weight: 900;
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.small{
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.divider{
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+
+/* ===== Form ===== */
+.row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
+input{
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  outline: none;
+  width: 100%;
+  background: #fff;
+}
+
+input:focus{
+  border-color: rgba(59,130,246,.65);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.18);
+}
+
+button{
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary);
+  color:#fff;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform .02s ease, opacity .2s ease;
+}
+
+button:active{ transform: scale(.99); }
+
+button.secondary{
+  background: var(--secondary);
+}
+
+/* ===== Chat / bubbles ===== */
+.chat{
+  display:grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.bubble{
+  max-width: 78%;
+  padding: 10px 12px;
+  border-radius: 16px;
+  line-height: 1.4;
+  font-size: 14px;
+}
+
+.right{
+  margin-left:auto;
+  background:#e0e7ff;
+}
+
+.left{
+  margin-right:auto;
+  background:#d1fae5;
+}
+
+.wait{
+  background:#fef9c3;
+}
+
+.bubble.wait{
+  background:#fff7c2 !important;
+}
+
+/* ===== Menu list item ===== */
+.menuItem{
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  cursor: pointer;
+  transition: background .15s ease, transform .02s ease;
+}
+
+.menuItem:hover{
+  background:#f8fafc;
+}
+
+.menuItem:active{
+  transform: scale(.995);
+}
+
+/* ===== Buyer choices card ===== */
+.choice{
+  background:#d8fbe8;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 10px 0;
+  max-width: 100%;
+  border: 1px solid rgba(16,185,129,.25);
+}
+
+.choice.wait{
+  background:#fff7c2;
+  border-color: rgba(234,179,8,.35);
+}
+
+.choiceTitle{
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.choiceMeta{
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(15,23,42,.75);
+}
+
+/* ===== Buy button ===== */
+.buyBtn{
+  margin-top: 10px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--primary);
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.buyBtn:hover{ background:#15803d; }
+.buyBtn:disabled{ opacity:0.6; cursor:not-allowed; }
