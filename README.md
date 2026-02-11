@@ -1,113 +1,105 @@
-# 🍽️ Toptri Chat
+# 🍽️ Toptri Chat (Desktop Version)
 
-Toptri Chat is a simple **buyer–seller real-time menu selection application** built with **Spring Boot and Firebase Firestore**.
+Toptri Chat is a simple **real-time buyer–seller food request application** built with **JavaFX Desktop GUI** and **Firebase Firestore**.
 
-A buyer sends a food request (e.g. *nasi padang*), the seller receives it, selects available menu items, and the buyer can immediately purchase one of the options.
+A buyer sends a food request (example: *nasi padang*), sellers receive the request instantly, offer matching menu items, and the buyer can view offers in a chat-style interface.
 
 ---
 
 ## ✨ Features
 
-### 👤 Buyer
-- Send food requests
-- Receive up to 3 menu recommendations
-- View menu price and vendor
-- Purchase menu items (Buy)
-- Orders are automatically stored in Firestore
+### 👤 Buyer Window
+- Type and send food requests
+- Requests are stored in Firestore
+- Automatically receives seller menu offers in real-time
+- Chat-style instant messaging interface
+- Can simulate purchasing a menu item
 
-### 🧑‍🍳 Seller
-- Receive buyer requests in real-time
-- View buyer messages
-- Select up to 3 menu items
-- Send menus to buyer with one click
+---
 
-### 🔥 Backend
-- Spring Boot REST API
-- Firebase Firestore (NoSQL)
-- Transaction-safe (request claiming & buying)
-- Simple polling-based real-time flow
+### 🧑‍🍳 Seller Window (Multiple Sellers Supported)
+- Real-time request inbox (all buyer requests appear)
+- Seller can select a request and respond
+- Offers up to 3 menu items per request
+- Offers are filtered based on the request category  
+  (example: *nasi padang* → only menus with category *nasi padang*)
+
+---
+
+### 🔥 Firestore Backend Integration
+- Requests stored in `requests` collection
+- Seller offers stored in `offers` subcollection
+- Real-time updates using Firestore listeners
+- Multi-seller support (Seller A, Seller B, etc.)
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Backend**: Java, Spring Boot 3
-- **Database**: Firebase Firestore
-- **Frontend**: HTML, CSS, Vanilla JavaScript
-- **Build Tool**: Maven
-- **Version Control**: Git & GitHub
+- **Language**: Java 21  
+- **Desktop GUI**: JavaFX  
+- **Database**: Firebase Firestore (NoSQL)  
+- **Build Tool**: Maven  
+- **Version Control**: Git & GitHub  
 
 ---
 
 ## 📂 Project Structure
+
 ```text
 toptri-chat/
 │
 ├─ src/main/java/com/toptri/
-│ └─ ToptriSimpleFirestoreApp.java
+│   └─ ToptriSimpleFirestoreApp.java   # Backend Firestore API (unchanged)
+│
+├─ src/main/java/com/toptri/desktop/
+│   ├─ ToptriDesktopLauncher.java      # Main Desktop Launcher
+│   ├─ FirestoreService.java           # Firestore helper methods
+│   ├─ BuyerWindow.java                # Buyer chat GUI
+│   ├─ SellerWindow.java               # Seller dashboard GUI
+│   └─ UiKit.java                      # UI components & styling
 │
 ├─ src/main/resources/
-│ ├─ static/
-│ │ ├─ buyer.html
-│ │ ├─ seller.html
-│ │ ├─ buyer.js
-│ │ ├─ seller.js
-│ │ ├─ api.js
-│ │ └─ styles.css
-│ │
-│ └─ application.properties
+│   ├─ application.properties
+│   └─ firebase-service-account.json   # NOT uploaded (ignored)
 │
 ├─ .gitignore
 ├─ pom.xml
 └─ README.md
 ```
 
----
-
 ## 🚀 How to Run
 
-### 1️⃣ Clone Repository
+### 1. Clone the project
+
 ```bash
 git clone https://github.com/oovp2601dna/toptri-chat.git
 cd toptri-chat
-```
-### 2️⃣ Firebase Configuration
-```bash
-Create a Firebase project
-Enable Firestore
-Download Service Account JSON
-Place it here:
-src/main/resources/firebase-service-account.json
-⚠️ Do NOT upload this file to GitHub
-Add to .gitignore:
-firebase-service-account.json
-target/
-```
-### 3️⃣ Configure application.properties
-```bash
-server.port=8081
-firebase.serviceAccountPath=classpath:firebase-service-account.json
-```
-### 4️⃣ Run Backend
-```bash
-mvn spring-boot:run
-```
-## How to use it
 
-#### Buyer 
-```bash
-Open:
-http://localhost:8081/buyer.html
-Enter a request (example: nasi padang)
+```
+
+### 2. Add Firebase Service Account
+```
+Place your Firebase key here:
+src/main/resources/firebase-service-account.json
+```
+### 3. Run the Desktop App
+```
+mvn javafx:run
+```
+
+## Usage
+### Buyer Window
+```
+Type a request (example: nasi padang)
 Click Send
-Wait for menu recommendations
-Click Buy
+Wait for seller offers
 ```
-#### Seller
-```bash
-Open:
-http://localhost:8081/seller.html
-Wait for incoming requests
-Click menu items (max 3)
-Menus are sent automatically to the buyer
 ```
+Seller Window
+Select a request from the inbox
+Click menu items to send offers (max 3)
+```
+
+
+
