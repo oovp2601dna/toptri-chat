@@ -19,6 +19,7 @@
   </properties>
 
   <dependencies>
+    <!-- Backend (unchanged) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -29,13 +30,33 @@
       <artifactId>firebase-admin</artifactId>
       <version>9.3.0</version>
     </dependency>
+
+    <!-- Desktop GUI -->
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-controls</artifactId>
+      <version>21.0.4</version>
+    </dependency>
+
+    
   </dependencies>
 
   <build>
     <plugins>
+      <!-- Spring Boot plugin (keep) -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!-- JavaFX run plugin -->
+      <plugin>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-maven-plugin</artifactId>
+        <version>0.0.8</version>
+        <configuration>
+          <mainClass>com.toptri.desktop.ToptriDesktopLauncher</mainClass>
+        </configuration>
       </plugin>
     </plugins>
   </build>

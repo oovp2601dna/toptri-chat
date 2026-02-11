@@ -415,7 +415,7 @@ public ResponseEntity<?> buy(@RequestBody BuyerBuyDto dto) throws Exception {
       return ResponseEntity.status(404).body(Map.of("error", "row_not_found"));
     }
 
-    // sisanya beneran error server
+   
     e.printStackTrace();
     return ResponseEntity.status(500).body(Map.of("error", "internal_error"));
   }
