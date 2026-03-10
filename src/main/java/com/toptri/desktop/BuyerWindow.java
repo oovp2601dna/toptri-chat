@@ -13,11 +13,11 @@ import javafx.stage.Stage;
 
 import java.util.*;
 import java.util.prefs.Preferences;
+import java.util.stream.Collectors;
 
 public class BuyerWindow {
 
     private final FirestoreService fs;
-
     private final String buyerId = getOrCreateBuyerId();
 
     private String currentRequestId = null;
@@ -41,8 +41,14 @@ public class BuyerWindow {
 
     private final Map<String, String> requestStatusById = new HashMap<>();
 
+    // ✅ NEW: Order history panel
+    private final VBox historyBox = new VBox(8);
+
     private Button sendBtn;
     private Button newBtn;
+
+    // ✅ NEW: persistent buyer name & address
+    private static final Preferences PREFS = Preferences.userNodeForPackage(BuyerWindow.class);
 
     public BuyerWindow(FirestoreService fs) {
         this.fs = fs;
@@ -57,14 +63,15 @@ public class BuyerWindow {
 
         Region header = UiKit.headerBar("Toptri Chat - Buyer");
 
-        // RIGHT: Chat
+        // ── Chat card ──
         VBox card = new VBox(12);
         card.setPadding(new Insets(6));
 
         Label title = UiKit.h1("Buyer");
 
         HBox sendRow = new HBox(10);
-        input.setPromptText("Type message (example: nasi padang / drink)");
+        // ✅ NEW: prompt shows multi-item example
+        input.setPromptText("e.g. '2 nasi padang 3 es teh' or just 'drink'");
         HBox.setHgrow(input, Priority.ALWAYS);
 
         sendBtn = UiKit.primaryButton("Send");
@@ -83,13 +90,33 @@ public class BuyerWindow {
         chatScroll.setStyle("-fx-background-color: transparent;");
         chatBox.setPadding(new Insets(10));
         chatBox.setFillWidth(true);
+        VBox.setVgrow(chatScroll, Priority.ALWAYS);
 
         card.getChildren().addAll(title, sendRow, ridRow, UiKit.divider(), chatScroll);
+        VBox.setVgrow(card, Priority.ALWAYS);
         Region chatCardWrap = UiKit.cardContainer(card);
+        VBox.setVgrow(chatCardWrap, Priority.ALWAYS);
 
-        // LEFT: My Requests
+        // ── ✅ NEW: Order History card ──
+        Label historyTitle = new Label("Order History");
+        historyTitle.setStyle("-fx-font-weight: 800; -fx-font-size: 15;");
+
+        ScrollPane historyScroll = new ScrollPane(historyBox);
+        historyScroll.setFitToWidth(true);
+        historyScroll.setStyle("-fx-background-color: transparent;");
+        historyScroll.setPrefHeight(170);
+        historyBox.setPadding(new Insets(4));
+        historyBox.setFillWidth(true);
+
+        VBox historyInner = new VBox(8, historyTitle, UiKit.divider(), historyScroll);
+        historyInner.setPadding(new Insets(10));
+        Region historyCardWrap = UiKit.cardContainer(historyInner);
+
+        VBox rightColumn = new VBox(14, chatCardWrap, historyCardWrap);
+        VBox.setVgrow(chatCardWrap, Priority.ALWAYS);
+
+        // ── Left: My Requests ──
         myReqList.setPrefWidth(340);
-
         myReqList.setCellFactory(lv -> new ListCell<>() {
             @Override
             protected void updateItem(RequestItem it, boolean empty) {
@@ -97,21 +124,18 @@ public class BuyerWindow {
                 if (empty || it == null) { setGraphic(null); return; }
 
                 VBox v = new VBox(2);
-
                 boolean completed = "COMPLETED".equalsIgnoreCase(it.status);
-
                 String label = "Buyer " + it.buyerRequestNo + (completed ? " (COMPLETED)" : "");
+
                 Label t = new Label(label);
                 t.setStyle("-fx-font-weight: 800;" + (completed ? " -fx-opacity: 0.70;" : ""));
 
                 Label s = UiKit.small(it.requestId);
-
                 Label p = UiKit.small(it.previewText);
                 p.setStyle(p.getStyle() + "; -fx-opacity: 0.55;");
 
                 v.getChildren().addAll(t, s, p);
                 setGraphic(v);
-
                 setOpacity(completed ? 0.85 : 1.0);
             }
         });
@@ -124,9 +148,10 @@ public class BuyerWindow {
         left.setPadding(new Insets(6));
         Region leftCardWrap = UiKit.cardContainer(left);
 
-        HBox center = new HBox(18, leftCardWrap, chatCardWrap);
+        HBox center = new HBox(18, leftCardWrap, rightColumn);
         center.setPadding(new Insets(26));
         center.setAlignment(Pos.TOP_CENTER);
+        HBox.setHgrow(rightColumn, Priority.ALWAYS);
 
         BorderPane root = new BorderPane();
         root.setTop(header);
@@ -134,53 +159,51 @@ public class BuyerWindow {
         UiKit.applyAppBackground(root);
 
         renderChat();
-        updateSendButtonState(); // ✅ initial state
-
-        // ✅ enable Send on Enter
+        updateSendButtonState();
         input.setOnAction(e -> onSend());
 
         stage.setTitle("Toptri Chat - Buyer");
-        stage.setScene(new Scene(root, 1060, 720));
+        stage.setScene(new Scene(root, 1060, 820));
         stage.show();
-
         stage.setOnCloseRequest(e -> cleanup());
 
         attachMyRequestsListener();
     }
+
+    // ============================================================
+    // STATE
+    // ============================================================
 
     private boolean isCurrentCompleted() {
         return currentRequestId != null && "COMPLETED".equalsIgnoreCase(currentRequestStatus);
     }
 
     private void updateSendButtonState() {
-        // ✅ rule:
-        // - if completed -> disable send
-        // - else always allow send (it can auto-create new request)
         boolean disable = isCurrentCompleted();
         sendBtn.setDisable(disable);
-
         if (disable) {
             input.setDisable(true);
-            input.setPromptText("Request completed ✅ (start New Request for new chat)");
+            input.setPromptText("Request completed ✅ — start New Request to chat again");
         } else {
             input.setDisable(false);
-            input.setPromptText("Type message (example: nasi padang / drink)");
+            input.setPromptText("e.g. '2 nasi padang 3 es teh' or just 'drink'");
         }
     }
 
+    // ============================================================
+    // SEND
+    // ============================================================
+
     private void onSend() {
         if (isCurrentCompleted()) return;
-
         String text = input.getText().trim();
         if (text.isBlank()) return;
         input.clear();
 
-        // ✅ If no current request, auto-create one
         if (currentRequestId == null) {
             currentRequestId = makeRequestId();
             currentRequestStatus = "OPEN";
             ridValue.setText(currentRequestId);
-
             messages.clear();
             offersByBuyerMessageId.clear();
             latestBuyerMessageId = null;
@@ -193,7 +216,6 @@ public class BuyerWindow {
             new Thread(() -> {
                 try {
                     fs.createConversation(currentRequestId, buyerId, firstText, buyerRequestNo);
-
                     attachMessagesListener(currentRequestId);
                     attachAllOffersListener(currentRequestId);
                 } catch (Exception ex) {
@@ -205,7 +227,6 @@ public class BuyerWindow {
 
         final String reqIdFinal = currentRequestId;
         final String textFinal = text;
-
         new Thread(() -> {
             try {
                 fs.sendBuyerMessage(reqIdFinal, buyerId, textFinal);
@@ -215,26 +236,26 @@ public class BuyerWindow {
         }).start();
     }
 
+    // ============================================================
+    // CONVERSATION LIFECYCLE
+    // ============================================================
+
     private long nextBuyerRequestNo() {
-        Preferences p = Preferences.userNodeForPackage(BuyerWindow.class);
-        long last = p.getLong("buyerRequestNoCounter", 0L);
+        long last = PREFS.getLong("buyerRequestNoCounter", 0L);
         long next = last + 1;
-        p.putLong("buyerRequestNoCounter", next);
+        PREFS.putLong("buyerRequestNoCounter", next);
         return next;
     }
 
     private void startNewConversation() {
         if (messagesListener != null) messagesListener.remove();
         if (offersAllListener != null) offersAllListener.remove();
-
         currentRequestId = null;
         currentRequestStatus = "OPEN";
         ridValue.setText("-");
-
         messages.clear();
         offersByBuyerMessageId.clear();
         latestBuyerMessageId = null;
-
         renderChat();
         updateSendButtonState();
     }
@@ -242,25 +263,24 @@ public class BuyerWindow {
     private void openConversation(String requestId, String status) {
         if (messagesListener != null) messagesListener.remove();
         if (offersAllListener != null) offersAllListener.remove();
-
         currentRequestId = requestId;
         currentRequestStatus = (status == null || status.isBlank()) ? "OPEN" : status;
         ridValue.setText(requestId);
-
         messages.clear();
         offersByBuyerMessageId.clear();
         latestBuyerMessageId = null;
-
         renderChat();
         updateSendButtonState();
-
         attachMessagesListener(requestId);
         attachAllOffersListener(requestId);
     }
 
+    // ============================================================
+    // LISTENERS
+    // ============================================================
+
     private void attachMessagesListener(String requestId) {
         if (messagesListener != null) messagesListener.remove();
-
         messagesListener = fs.listenMessages(
                 requestId,
                 snap -> Platform.runLater(() -> onMessagesUpdate(snap)),
@@ -271,27 +291,24 @@ public class BuyerWindow {
     private void onMessagesUpdate(QuerySnapshot snap) {
         messages.clear();
         latestBuyerMessageId = null;
-
         for (QueryDocumentSnapshot d : snap.getDocuments()) {
             String id = d.getId();
             String senderType = safe(d.getString("senderType"));
             String senderId = safe(d.getString("senderId"));
             String text = safe(d.getString("text"));
-
-            messages.add(new Message(id, senderType, senderId, text));
-
+            // ✅ NEW: parse multi-item order from text
+            List<FirestoreService.OrderItem> orderItems = FirestoreService.parseOrderItems(text);
+            messages.add(new Message(id, senderType, senderId, text, orderItems));
             if ("BUYER".equalsIgnoreCase(senderType)) {
                 latestBuyerMessageId = id;
             }
         }
-
         renderChat();
         Platform.runLater(() -> chatScroll.setVvalue(1.0));
     }
 
     private void attachAllOffersListener(String requestId) {
         if (offersAllListener != null) offersAllListener.remove();
-
         offersAllListener = fs.listenAllOffers(
                 requestId,
                 snap -> Platform.runLater(() -> onAllOffersUpdate(snap)),
@@ -299,21 +316,16 @@ public class BuyerWindow {
         );
     }
 
+    @SuppressWarnings("unchecked")
     private void onAllOffersUpdate(QuerySnapshot snap) {
         offersByBuyerMessageId.clear();
-
         for (QueryDocumentSnapshot d : snap.getDocuments()) {
             String buyerMsgId = safe(d.getString("buyerMessageId"));
             if (buyerMsgId.isBlank()) continue;
 
             String id = d.getId();
             String sellerId = safe(d.getString("sellerId"));
-            String menuName = safe(d.getString("menuName"));
-
-            int price = 0;
-            Long p = d.getLong("price");
-            if (p != null) price = p.intValue();
-
+            String sellerContact = safe(d.getString("sellerContact")); // ✅ NEW
             String vendor = safe(d.getString("vendor"));
 
             int etaMinutes = 0;
@@ -324,27 +336,62 @@ public class BuyerWindow {
             Double r = d.getDouble("rating");
             if (r != null) rating = r;
 
-            Offer offer = new Offer(id, sellerId, menuName, price, vendor, etaMinutes, rating);
+            // ✅ NEW: read multi-item offer lines
+            List<Map<String, Object>> rawLines = (List<Map<String, Object>>) d.get("offerLines");
+            List<OfferLine> offerLines = new ArrayList<>();
+            int grandTotal = 0;
+
+            if (rawLines != null && !rawLines.isEmpty()) {
+                for (Map<String, Object> line : rawLines) {
+                    String name = safe((String) line.get("menuName"));
+                    int qty = line.get("qty") instanceof Long ? ((Long) line.get("qty")).intValue() : 1;
+                    int price = line.get("price") instanceof Long ? ((Long) line.get("price")).intValue() : 0;
+                    offerLines.add(new OfferLine(name, qty, price));
+                    grandTotal += qty * price;
+                }
+            } else {
+                // legacy single-item fallback
+                String menuName = safe(d.getString("menuName"));
+                int price = 0;
+                Long p = d.getLong("price");
+                if (p != null) price = p.intValue();
+                int qty = 1;
+                Long q = d.getLong("quantity");
+                if (q != null && q > 0) qty = q.intValue();
+                offerLines.add(new OfferLine(menuName, qty, price));
+                grandTotal = qty * price;
+            }
+
+            Long storedTotal = d.getLong("grandTotal");
+            if (storedTotal != null && storedTotal > 0) grandTotal = storedTotal.intValue();
+
+            Offer offer = new Offer(id, sellerId, offerLines, grandTotal, vendor, etaMinutes, rating, sellerContact);
             offersByBuyerMessageId.computeIfAbsent(buyerMsgId, k -> new ArrayList<>()).add(offer);
         }
-
         renderChat();
         Platform.runLater(() -> chatScroll.setVvalue(1.0));
     }
+
+    // ============================================================
+    // RENDER CHAT
+    // ============================================================
 
     private void renderChat() {
         chatBox.getChildren().clear();
 
         if (currentRequestId == null) {
-            chatBox.getChildren().add(
-                    UiKit.bubbleWait("Send your first message to start a new request.\nOr select an old request from the left.")
-            );
+            chatBox.getChildren().add(UiKit.bubbleWait(
+                "Send your first message to start a new request.\n" +
+                "Or select an old request from the left.\n\n" +
+                "💡 You can order multiple items at once!\n" +
+                "   e.g. '2 nasi padang 3 es teh'"
+            ));
             return;
         }
 
         boolean completed = isCurrentCompleted();
         if (completed) {
-            chatBox.getChildren().add(UiKit.bubbleWait("✅ This request is COMPLETED. Start a New Request to chat again."));
+            chatBox.getChildren().add(UiKit.bubbleWait("✅ Request COMPLETED. Start a New Request to chat again."));
             chatBox.getChildren().add(UiKit.divider());
         }
 
@@ -355,41 +402,24 @@ public class BuyerWindow {
 
         for (Message m : messages) {
             boolean isBuyer = "BUYER".equalsIgnoreCase(m.senderType);
-
             if (isBuyer) {
-                chatBox.getChildren().add(UiKit.bubbleRight(m.text));
+                // ✅ NEW: show multi-item breakdown in bubble
+                chatBox.getChildren().add(UiKit.bubbleRight(buildBuyerBubbleText(m)));
 
                 List<Offer> offs = offersByBuyerMessageId.getOrDefault(m.id, Collections.emptyList());
                 if (!offs.isEmpty()) {
                     for (Offer o : offs) {
-                        String sellerPart = o.sellerId.isBlank() ? "-" : o.sellerId;
-                        String vendorPart = o.vendor.isBlank() ? "-" : o.vendor;
-                        String etaPart = (o.etaMinutes > 0) ? ("ETA " + o.etaMinutes + " min") : "ETA -";
-                        String ratingPart = (o.rating > 0) ? ("⭐ " + String.format(Locale.US, "%.1f", o.rating)) : "⭐ -";
-
-                        String subtitle = UiKit.rupiah(o.price)
-                                + " • " + sellerPart
-                                + " • " + vendorPart
-                                + " • " + etaPart
-                                + " • " + ratingPart;
-
-                        Region card = UiKit.offerCard(o.menuName, subtitle, () -> {
-                            if (!completed) onBuy(o);
+                        final Offer offerRef = o;
+                        Region card = buildOfferCard(o, completed, () -> {
+                            if (!completed) onBuy(offerRef);
                         });
-
-                        if (completed) {
-                            card.setOpacity(0.65);
-                            card.setDisable(true);
-                        }
-
                         chatBox.getChildren().add(card);
                     }
                 } else {
                     if (m.id.equals(latestBuyerMessageId) && !completed) {
-                        chatBox.getChildren().add(UiKit.bubbleWait("⏳ Waiting seller offers for this message..."));
+                        chatBox.getChildren().add(UiKit.bubbleWait("⏳ Waiting for seller offers..."));
                     }
                 }
-
                 chatBox.getChildren().add(UiKit.divider());
             } else {
                 chatBox.getChildren().add(UiKit.bubbleWait(m.text));
@@ -397,26 +427,156 @@ public class BuyerWindow {
         }
     }
 
+    // ✅ NEW: multi-item buyer bubble text
+    private String buildBuyerBubbleText(Message m) {
+        if (m.orderItems == null || m.orderItems.size() <= 1) return m.text;
+        StringBuilder sb = new StringBuilder(m.text).append("\n");
+        for (FirestoreService.OrderItem oi : m.orderItems) {
+            sb.append("  • ").append(oi.qty).append("× ").append(oi.name).append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    // ✅ NEW: offer card with per-line items, grand total, seller contact
+    private Region buildOfferCard(Offer o, boolean completed, Runnable onBuy) {
+        VBox box = new VBox(6);
+        box.setPadding(new Insets(14));
+        box.setStyle("-fx-background-color: " + UiKit.OFFER_BG + "; -fx-background-radius: 18;");
+
+        // seller + contact
+        String sellerLabel = o.sellerId.isBlank() ? "Seller" : o.sellerId;
+        Label sellerLbl = new Label(sellerLabel);
+        sellerLbl.setStyle("-fx-font-weight: 800; -fx-font-size: 13;");
+        box.getChildren().add(sellerLbl);
+
+        // ✅ NEW: seller contact
+        if (!o.sellerContact.isBlank()) {
+            Label contactLbl = new Label("📞 " + o.sellerContact);
+            contactLbl.setStyle("-fx-font-size: 12; -fx-text-fill: #5F5BFF; -fx-font-weight: 600;");
+            box.getChildren().add(contactLbl);
+        }
+
+        box.getChildren().add(UiKit.divider());
+
+        // ✅ NEW: per-line items (multi-item format: name qty×price = subtotal)
+        for (OfferLine line : o.offerLines) {
+            int lineTotal = line.qty * line.price;
+            String lineText = line.name + "   " + line.qty + "×" + UiKit.rupiah(line.price)
+                    + "  =  " + UiKit.rupiah(lineTotal);
+            Label lineLbl = new Label(lineText);
+            lineLbl.setStyle("-fx-font-size: 13;");
+            box.getChildren().add(lineLbl);
+        }
+
+        // ✅ NEW: grand total
+        Label totalLbl = new Label("Total:  " + UiKit.rupiah(o.grandTotal));
+        totalLbl.setStyle("-fx-font-weight: 800; -fx-font-size: 16; -fx-padding: 4 0 0 0;");
+        box.getChildren().add(totalLbl);
+
+        // meta (vendor, eta, rating)
+        List<String> metaParts = new ArrayList<>();
+        if (!o.vendor.isBlank()) metaParts.add(o.vendor);
+        if (o.etaMinutes > 0) metaParts.add("ETA " + o.etaMinutes + " min");
+        if (o.rating > 0) metaParts.add("⭐ " + String.format(Locale.US, "%.1f", o.rating));
+        if (!metaParts.isEmpty()) {
+            box.getChildren().add(UiKit.small(String.join(" • ", metaParts)));
+        }
+
+        // buy button showing total
+        Button buyBtn = new Button("Buy  " + UiKit.rupiah(o.grandTotal));
+        buyBtn.setOnAction(e -> onBuy.run());
+        buyBtn.setStyle(
+                "-fx-background-color: " + UiKit.GREEN_BTN + ";" +
+                "-fx-text-fill: white;" +
+                "-fx-font-weight: 800;" +
+                "-fx-padding: 8 18;" +
+                "-fx-background-radius: 14;"
+        );
+        box.getChildren().add(buyBtn);
+
+        if (completed) {
+            box.setOpacity(0.65);
+            box.setDisable(true);
+        }
+
+        HBox row = new HBox(box);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setMaxWidth(Double.MAX_VALUE);
+        return row;
+    }
+
+    // ============================================================
+    // ✅ NEW: ORDER HISTORY
+    // ============================================================
+
+    private void renderHistory(List<RequestItem> allItems) {
+        historyBox.getChildren().clear();
+        List<RequestItem> completed = allItems.stream()
+                .filter(it -> "COMPLETED".equalsIgnoreCase(it.status))
+                .collect(Collectors.toList());
+
+        if (completed.isEmpty()) {
+            historyBox.getChildren().add(UiKit.small("No completed orders yet."));
+            return;
+        }
+
+        for (RequestItem it : completed) {
+            HBox row = new HBox(12);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPadding(new Insets(7, 12, 7, 12));
+            row.setStyle("-fx-background-color: " + UiKit.OFFER_BG + "; -fx-background-radius: 10;");
+
+            Label num = new Label("Order #" + it.buyerRequestNo);
+            num.setStyle("-fx-font-weight: 800; -fx-font-size: 12;");
+
+            String preview = it.previewText.length() > 32
+                    ? it.previewText.substring(0, 32) + "…"
+                    : it.previewText;
+            Label prev = UiKit.small("  " + preview);
+            HBox.setHgrow(prev, Priority.ALWAYS);
+
+            Label badge = new Label("✅ DONE");
+            badge.setStyle("-fx-text-fill: " + UiKit.GREEN_BTN + "; -fx-font-weight: 800; -fx-font-size: 11;");
+
+            row.getChildren().addAll(num, prev, badge);
+            historyBox.getChildren().add(row);
+        }
+    }
+
+    // ============================================================
+    // BUY
+    // ============================================================
+
     private void onBuy(Offer offer) {
         if (currentRequestId == null || currentRequestId.isBlank()) return;
         if (isCurrentCompleted()) return;
 
-        TextInputDialog nameDlg = new TextInputDialog("");
-        nameDlg.setTitle("Buyer Info");
-        nameDlg.setHeaderText("Buyer name (optional)");
-        String name = nameDlg.showAndWait().orElse("");
+        // ✅ NEW: pre-fill name & address from saved Preferences
+        String savedName = PREFS.get("buyerName", "");
+        String savedAddress = PREFS.get("buyerAddress", "");
 
-        TextInputDialog addrDlg = new TextInputDialog("");
+        TextInputDialog nameDlg = new TextInputDialog(savedName);
+        nameDlg.setTitle("Buyer Info");
+        nameDlg.setHeaderText("Your name (optional)");
+        String name = nameDlg.showAndWait().orElse(savedName);
+
+        TextInputDialog addrDlg = new TextInputDialog(savedAddress);
         addrDlg.setTitle("Buyer Info");
-        addrDlg.setHeaderText("Address (optional)");
-        String address = addrDlg.showAndWait().orElse("");
+        addrDlg.setHeaderText("Delivery address (optional)");
+        String address = addrDlg.showAndWait().orElse(savedAddress);
+
+        // ✅ persist for next time
+        PREFS.put("buyerName", name == null ? "" : name.trim());
+        PREFS.put("buyerAddress", address == null ? "" : address.trim());
 
         final String reqIdFinal = currentRequestId;
         final String offerIdFinal = offer.id;
+        final String nameFinal = name;
+        final String addrFinal = address;
 
         new Thread(() -> {
             try {
-                fs.completeRequestSimple(reqIdFinal, offerIdFinal, name, address);
+                fs.completeRequestWithQuantity(reqIdFinal, offerIdFinal, nameFinal, addrFinal, offer.grandTotal);
 
                 Platform.runLater(() -> {
                     requestStatusById.put(reqIdFinal, "COMPLETED");
@@ -424,10 +584,21 @@ public class BuyerWindow {
                     updateSendButtonState();
                     renderChat();
 
+                    // ✅ NEW: itemized confirmation dialog
+                    StringBuilder sb = new StringBuilder();
+                    for (OfferLine line : offer.offerLines) {
+                        sb.append(line.name)
+                          .append("   ").append(line.qty).append("×").append(UiKit.rupiah(line.price))
+                          .append("  =  ").append(UiKit.rupiah(line.qty * line.price)).append("\n");
+                    }
+                    sb.append("─────────────────────\n");
+                    sb.append("Total:  ").append(UiKit.rupiah(offer.grandTotal)).append("\n");
+                    sb.append("Address: ").append(addrFinal.isBlank() ? "-" : addrFinal);
+
                     Alert ok = new Alert(Alert.AlertType.INFORMATION);
-                    ok.setTitle("Purchase");
-                    ok.setHeaderText("✅ Purchase simulated");
-                    ok.setContentText("Request marked as COMPLETED ✅");
+                    ok.setTitle("Purchase Confirmed");
+                    ok.setHeaderText("✅ Order confirmed!");
+                    ok.setContentText(sb.toString());
                     ok.showAndWait();
                 });
 
@@ -437,9 +608,12 @@ public class BuyerWindow {
         }).start();
     }
 
+    // ============================================================
+    // MY REQUESTS LISTENER
+    // ============================================================
+
     private void attachMyRequestsListener() {
         if (myReqListener != null) myReqListener.remove();
-
         myReqListener = fs.listenBuyerRequests(
                 buyerId,
                 snap -> Platform.runLater(() -> {
@@ -449,38 +623,37 @@ public class BuyerWindow {
                     for (QueryDocumentSnapshot d : snap.getDocuments()) {
                         String rid = safe(d.getString("requestId"));
                         if (rid.isBlank()) continue;
-
                         String preview = safe(d.getString("buyerText"));
                         String st = safe(d.getString("status"));
                         if (st.isBlank()) st = "OPEN";
-
                         requestStatusById.put(rid, st);
-
                         long no = 0L;
                         Long n = d.getLong("buyerRequestNo");
                         if (n != null) no = n;
                         if (no <= 0) no = items.size() + 1;
-
                         items.add(new RequestItem(rid, preview, no, st));
                     }
 
                     items.sort(Comparator.comparingLong(a -> a.buyerRequestNo));
                     myReqList.getItems().setAll(items);
+                    renderHistory(items); // ✅ NEW
 
                     if (currentRequestId != null) {
                         currentRequestStatus = requestStatusById.getOrDefault(currentRequestId, currentRequestStatus);
                         updateSendButtonState();
                         renderChat();
                     }
-
                     if (currentRequestId == null && !items.isEmpty()) {
-                        // do nothing auto-open; let user pick
                         updateSendButtonState();
                     }
                 }),
                 err -> Platform.runLater(() -> showError("Requests listener error", err.getMessage()))
         );
     }
+
+    // ============================================================
+    // UTILS
+    // ============================================================
 
     private void showError(String title, String msg) {
         Platform.runLater(() -> {
@@ -515,12 +688,13 @@ public class BuyerWindow {
         return id;
     }
 
-    private static class RequestItem {
-        final String requestId;
-        final String previewText;
-        final long buyerRequestNo;
-        final String status;
+    // ============================================================
+    // INNER CLASSES
+    // ============================================================
 
+    private static class RequestItem {
+        final String requestId, previewText, status;
+        final long buyerRequestNo;
         RequestItem(String requestId, String previewText, long buyerRequestNo, String status) {
             this.requestId = requestId;
             this.previewText = previewText == null ? "" : previewText;
@@ -530,36 +704,45 @@ public class BuyerWindow {
     }
 
     private static class Message {
-        final String id;
-        final String senderType;
-        final String senderId;
-        final String text;
-
-        Message(String id, String senderType, String senderId, String text) {
+        final String id, senderType, senderId, text;
+        final List<FirestoreService.OrderItem> orderItems;
+        Message(String id, String senderType, String senderId, String text, List<FirestoreService.OrderItem> orderItems) {
             this.id = id;
             this.senderType = senderType == null ? "" : senderType;
             this.senderId = senderId == null ? "" : senderId;
             this.text = text == null ? "" : text;
+            this.orderItems = orderItems == null ? new ArrayList<>() : orderItems;
         }
     }
 
+    // ✅ NEW: one line in a multi-item offer
+    static class OfferLine {
+        final String name;
+        final int qty, price;
+        OfferLine(String name, int qty, int price) {
+            this.name = name == null ? "" : name;
+            this.qty = Math.max(qty, 1);
+            this.price = price;
+        }
+    }
+
+    // ✅ NEW: offer with multiple lines + grand total + seller contact
     private static class Offer {
-        final String id;
-        final String sellerId;
-        final String menuName;
-        final int price;
-        final String vendor;
-        final int etaMinutes;
+        final String id, sellerId, vendor, sellerContact;
+        final List<OfferLine> offerLines;
+        final int grandTotal, etaMinutes;
         final double rating;
 
-        Offer(String id, String sellerId, String menuName, int price, String vendor, int etaMinutes, double rating) {
+        Offer(String id, String sellerId, List<OfferLine> offerLines, int grandTotal,
+              String vendor, int etaMinutes, double rating, String sellerContact) {
             this.id = id;
             this.sellerId = sellerId == null ? "" : sellerId;
-            this.menuName = menuName == null ? "" : menuName;
-            this.price = price;
+            this.offerLines = offerLines == null ? new ArrayList<>() : offerLines;
+            this.grandTotal = grandTotal;
             this.vendor = vendor == null ? "" : vendor;
             this.etaMinutes = etaMinutes;
             this.rating = rating;
+            this.sellerContact = sellerContact == null ? "" : sellerContact;
         }
     }
 }
