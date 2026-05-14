@@ -23,30 +23,11 @@ import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
 
 import java.awt.Desktop;
-import java.net.URI;
 import javafx.scene.web.WebView;
 import javafx.scene.web.WebEngine;
 import netscape.javascript.JSObject;
 
 public class BuyerWindow {
-
-    // ── Design tokens — dari UiKit ────────────────────────────────
-    private static final String COLOR_BG            = UiKit.COLOR_BG;
-    private static final String COLOR_SURFACE       = UiKit.COLOR_SURFACE;
-    private static final String COLOR_PRIMARY       = UiKit.COLOR_PRIMARY;
-    private static final String COLOR_PRIMARY_DARK  = UiKit.COLOR_PRIMARY_DARK;
-    private static final String COLOR_BUYER_BUBBLE  = UiKit.COLOR_BUYER_BUBBLE;
-    private static final String COLOR_SELLER_BUBBLE = UiKit.COLOR_SELLER_BUBBLE;
-    private static final String COLOR_OFFER_BUBBLE  = UiKit.COLOR_OFFER_BUBBLE;
-    private static final String COLOR_SIDEBAR_BG    = UiKit.COLOR_SIDEBAR_BG;
-    private static final String COLOR_SELECTED_ROW  = UiKit.COLOR_SELECTED_ROW;
-    private static final String COLOR_TEXT_MAIN     = UiKit.COLOR_TEXT_MAIN;
-    private static final String COLOR_TEXT_MUTED    = UiKit.COLOR_TEXT_MUTED;
-    private static final String COLOR_DIVIDER       = UiKit.COLOR_DIVIDER;
-    private static final String COLOR_SUCCESS       = UiKit.COLOR_SUCCESS;
-    private static final String COLOR_DANGER        = UiKit.COLOR_DANGER;
-    private static final String COLOR_WARN          = UiKit.COLOR_WARN;
-    private static final String COLOR_COMPLETED_BG  = UiKit.COLOR_COMPLETED_BG;
 
     // ── Services / state ─────────────────────────────────────────
     private final FirestoreService fs;
@@ -83,9 +64,12 @@ public class BuyerWindow {
     // Flag: tampilkan widget menu Coffee di renderChat()
     private boolean pendingCoffeeMenu = false;
     // State step 10: data untuk widget pembayaran
-    private AiAutoReply.IndomaretLocation pickedIndomaret = null;
-    private AiAutoReply.DeliveryFormResult pickedDelivery  = null;
-    private boolean paymentWidgetShowing = false;
+
+    // State widget peta — disimpan supaya renderChat() bisa rebuild kalau Firestore update
+    private List<AiAutoReply.IndomaretLocation> pendingMapLocs   = null;
+    private AiAutoReply.DeliveryFormResult       pendingMapResult = null;
+    private double[]                             pendingMapCoords = null;
+    private boolean                              mapWidgetShowing = false;
 
     // ── UI components ────────────────────────────────────────────
 
@@ -144,7 +128,7 @@ public class BuyerWindow {
         BorderPane rootPane = new BorderPane();
         rootPane.setTop(appBar);
         rootPane.setCenter(body);
-        rootPane.setStyle("-fx-background-color: " + COLOR_BG + ";");
+        rootPane.setStyle("-fx-background-color: " + UiKit.COLOR_BG + ";");
 
         StackPane layered = new StackPane(rootPane, toastContainer);
         StackPane.setAlignment(toastContainer, Pos.TOP_RIGHT);
@@ -168,20 +152,20 @@ public class BuyerWindow {
     private HBox buildAppBar() {
         Label logo = new Label("🏪  Indomaret Point");
         logo.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 18));
-        logo.setStyle("-fx-text-fill: " + COLOR_PRIMARY + ";");
+        logo.setStyle("-fx-text-fill: " + UiKit.COLOR_PRIMARY + ";");
 
         Label role = new Label("Buyer: " + buyerId);
-        role.setStyle("-fx-text-fill: " + COLOR_TEXT_MUTED + "; -fx-font-size: 13;");
+        role.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + "; -fx-font-size: 13;");
 
         styleStatusPill(statusPill, "neutral");
 
         newBtn.setStyle(
-            "-fx-background-color: " + COLOR_PRIMARY + ";" +
+            "-fx-background-color: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12;" +
             "-fx-background-radius: 20; -fx-padding: 6 16; -fx-cursor: hand;"
         );
-        newBtn.setOnMouseEntered(e -> newBtn.setStyle(newBtn.getStyle().replace(COLOR_PRIMARY, COLOR_PRIMARY_DARK)));
-        newBtn.setOnMouseExited(e  -> newBtn.setStyle(newBtn.getStyle().replace(COLOR_PRIMARY_DARK, COLOR_PRIMARY)));
+        newBtn.setOnMouseEntered(e -> newBtn.setStyle(newBtn.getStyle().replace(UiKit.COLOR_PRIMARY, UiKit.COLOR_PRIMARY_DARK)));
+        newBtn.setOnMouseExited(e  -> newBtn.setStyle(newBtn.getStyle().replace(UiKit.COLOR_PRIMARY_DARK, UiKit.COLOR_PRIMARY)));
         newBtn.setOnAction(e -> startNewConversation());
 
         Region spacer = new Region();
@@ -191,8 +175,8 @@ public class BuyerWindow {
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(14, 20, 14, 20));
         bar.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 0 1 0;"
         );
         return bar;
@@ -203,10 +187,10 @@ public class BuyerWindow {
     private VBox buildSidebar() {
         Label title = new Label("Pesananku");
         title.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 15));
-        title.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        title.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
         reqCountLabel.setStyle(
-            "-fx-background-color: " + COLOR_PRIMARY + ";" +
+            "-fx-background-color: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-text-fill: white; -fx-font-size: 11; -fx-font-weight: bold;" +
             "-fx-background-radius: 10; -fx-padding: 1 7;"
         );
@@ -226,14 +210,14 @@ public class BuyerWindow {
         VBox.setVgrow(myReqList, Priority.ALWAYS);
 
         Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: " + COLOR_DIVIDER + ";");
+        sep.setStyle("-fx-background-color: " + UiKit.COLOR_DIVIDER + ";");
 
         VBox sidebar = new VBox(0, sidebarHeader, sep, myReqList);
         sidebar.setPrefWidth(270);
         sidebar.setMaxWidth(270);
         sidebar.setStyle(
-            "-fx-background-color: " + COLOR_SIDEBAR_BG + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SIDEBAR_BG + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 1 0 0;"
         );
         VBox.setVgrow(sidebar, Priority.ALWAYS);
@@ -245,14 +229,14 @@ public class BuyerWindow {
     private VBox buildChatPanel() {
         Label chatTitle = new Label("💬  Percakapan");
         chatTitle.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 15));
-        chatTitle.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        chatTitle.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
         HBox chatTopBar = new HBox(10, chatTitle);
         chatTopBar.setAlignment(Pos.CENTER_LEFT);
         chatTopBar.setPadding(new Insets(14, 16, 10, 16));
         chatTopBar.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 0 1 0;"
         );
 
@@ -260,7 +244,7 @@ public class BuyerWindow {
         chatBox.setFillWidth(true);
 
         chatScroll.setFitToWidth(true);
-        chatScroll.setStyle("-fx-background-color: " + COLOR_BG + "; -fx-background: " + COLOR_BG + ";");
+        chatScroll.setStyle("-fx-background-color: " + UiKit.COLOR_BG + "; -fx-background: " + UiKit.COLOR_BG + ";");
         chatScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         VBox.setVgrow(chatScroll, Priority.ALWAYS);
 
@@ -275,14 +259,14 @@ public class BuyerWindow {
         inputBar.setAlignment(Pos.CENTER);
         inputBar.setPadding(new Insets(10, 16, 14, 16));
         inputBar.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 1 0 0 0;"
         );
 
         VBox panel = new VBox(0, chatTopBar, chatScroll, inputBar);
         VBox.setVgrow(chatScroll, Priority.ALWAYS);
-        panel.setStyle("-fx-background-color: " + COLOR_BG + ";");
+        panel.setStyle("-fx-background-color: " + UiKit.COLOR_BG + ";");
         return panel;
     }
 
@@ -331,9 +315,10 @@ public class BuyerWindow {
             pendingYummyMenu     = false;
             pendingBakeryMenu    = false;
             pendingCoffeeMenu    = false;
-            pickedIndomaret      = null;
-            pickedDelivery       = null;
-            paymentWidgetShowing = false;
+            pendingMapLocs   = null;
+            pendingMapResult = null;
+            pendingMapCoords = null;
+            mapWidgetShowing = false;
             renderChat();
             updateInputState();
 
@@ -359,8 +344,10 @@ public class BuyerWindow {
                         })
                     );
                 } catch (Exception ex) {
-                    showError("Gagal membuat request", ex.getMessage());
-                    setStatus("Error ❌", "error");
+                    Platform.runLater(() -> {
+                        showError("Gagal membuat request", ex.getMessage());
+                        setStatus("Error ❌", "error");
+                    });
                 }
             }).start();
             return;
@@ -385,8 +372,10 @@ public class BuyerWindow {
                     })
                 );
             } catch (Exception ex) {
-                showError("Gagal kirim pesan", ex.getMessage());
-                setStatus("Error ❌", "error");
+                Platform.runLater(() -> {
+                    showError("Gagal kirim pesan", ex.getMessage());
+                    setStatus("Error ❌", "error");
+                });
             }
         }).start();
     }
@@ -415,9 +404,10 @@ public class BuyerWindow {
         pendingItem          = null;
         categoryChosen       = false;
             pendingYummyMenu     = false;
-            pickedIndomaret      = null;
-            pickedDelivery       = null;
-            paymentWidgetShowing = false;
+            pendingMapLocs       = null;
+            pendingMapResult     = null;
+            pendingMapCoords     = null;
+            mapWidgetShowing     = false;
         myReqList.getSelectionModel().clearSelection();
         renderChat();
         updateInputState();
@@ -436,10 +426,13 @@ public class BuyerWindow {
         deliveryFormShowing  = false;
         pendingItem          = null;
         categoryChosen       = false;
-            pendingYummyMenu     = false;
-            pickedIndomaret      = null;
-            pickedDelivery       = null;
-            paymentWidgetShowing = false;
+        pendingYummyMenu     = false;
+        pendingBakeryMenu    = false;
+        pendingCoffeeMenu    = false;
+        pendingMapLocs       = null;
+        pendingMapResult     = null;
+        pendingMapCoords     = null;
+        mapWidgetShowing     = false;
         renderChat();
         updateInputState();
         attachMessagesListener(requestId);
@@ -602,9 +595,16 @@ public class BuyerWindow {
     // ============================================================
 
 private void renderChat() {
+    // 1. Bersihkan layar
     chatBox.getChildren().clear();
-    paymentWidgetShowing = false;
 
+    // Reset rendering flags untuk widget interaktif
+    mapWidgetShowing     = false;
+    pendingMapLocs       = null;
+    pendingMapResult     = null;
+    pendingMapCoords     = null;
+
+    // 2. Cek jika belum ada request aktif
     if (currentRequestId == null) {
         chatBox.getChildren().add(emptyChatHint(
             "👋 Halo! Tulis pesananmu di bawah untuk mulai.\n\n" +
@@ -614,10 +614,12 @@ private void renderChat() {
         return;
     }
 
+    // 3. Tampilkan Banner jika pesanan sudah selesai
     if (isCurrentCompleted()) {
         chatBox.getChildren().add(buildCompletedBanner());
     }
 
+    // 4. Tampilkan Loading jika pesan masih kosong (sedang ditarik dari Firestore)
     if (messages.isEmpty()) {
         chatBox.getChildren().add(
             buildPendingBubble("⏳ Memuat percakapan...")
@@ -625,61 +627,57 @@ private void renderChat() {
         return;
     }
 
-    boolean greetingShown = false;
-
+    // 5. LOOPING: Gambar ulang semua chat history dari List messages
     for (Message m : messages) {
-
-        boolean isBuyer =
-                "BUYER".equalsIgnoreCase(m.senderType);
+        boolean isBuyer = "BUYER".equalsIgnoreCase(m.senderType);
 
         if (isBuyer) {
-
-            // Pesan "📋 Data Pengiriman" tidak perlu ditampilkan sebagai bubble
-            // karena sudah ada form widget yang lebih rapi
-            if (!m.text.contains("📋 Data Pengiriman") && !m.text.contains("📍 Buyer memilih Indomaret") && !m.text.contains("💳 Buyer memilih pembayaran")) {
+            // Saring pesan sistem agar tidak muncul sebagai bubble chat yang berantakan
+            if (!m.text.contains("📋 Data Pengiriman") && 
+                !m.text.contains("📍 Buyer memilih Indomaret") && 
+                !m.text.contains("💳 Buyer memilih pembayaran")) {
+                
                 chatBox.getChildren().add(
                     buildBuyerBubble(buildBuyerBubbleText(m))
                 );
             }
 
-            List<Offer> offs =
-                    offersByBuyerMessageId.getOrDefault(
-                            m.id,
-                            Collections.emptyList()
-                    );
-
+            // Cek apakah ada penawaran (Offers) dari Seller untuk pesan ini
+            List<Offer> offs = offersByBuyerMessageId.getOrDefault(m.id, Collections.emptyList());
             if (!offs.isEmpty()) {
-
                 for (Offer o : offs) {
-
                     final Offer offerRef = o;
-
                     chatBox.getChildren().add(
                         buildOfferBubble(
-                                o,
-                                isCurrentCompleted(),
-                                () -> onBuy(offerRef)
+                            o,
+                            isCurrentCompleted(),
+                            () -> onBuy(offerRef)
                         )
                     );
                 }
-
             }
-
             chatBox.getChildren().add(chatDivider());
 
         } else {
-
-            // Pesan [AUTO] dari AI_BOT — jangan render sebagai seller bubble biasa.
-            // Widget AI (greeting + video + kategori) dirender dari lastAiPayload di bawah.
+            // Logika Pesan Seller / AI
             if (m.text.contains("[AUTO]")) {
-                greetingShown = true;
+                // Kita tidak gambar bubble text biasa untuk [AUTO], 
+                // karena akan digambar lebih rapi oleh widget AI di bawah.
             } else {
                 chatBox.getChildren().add(buildSellerBubble(m.text));
             }
         }
     }
 
-    // AI widget — render dari lastAiPayload,
+    // 6. KUNCI PERBAIKAN: Render ulang Widget AI (Menu/Pembayaran)
+    // Bagian ini menjaga agar tombol tidak hilang saat Firestore update data di background.
+    if (!categoryChosen && lastAiPayload != null) {
+        
+        // Jarak sedikit agar rapi
+        Region spacer = new Region();
+        spacer.setPrefHeight(10);
+        chatBox.getChildren().add(spacer);
+    }
     // ATAU rebuild dari Firestore [AUTO] message kalau lastAiPayload null (misal app restart)
     // Jika categoryChosen, skip seluruhnya
     if (!categoryChosen) {
@@ -738,19 +736,23 @@ private void renderChat() {
         deliveryFormShowing = true;
     }
 
-    // Payment widget — hanya untuk kasus app restart (normalnya diinject langsung oleh onIndomaretPicked)
-    if (pickedIndomaret != null && pickedDelivery != null
-            && !paymentWidgetShowing && !isCurrentCompleted()
+    // Map widget — rebuild dari state kalau Firestore update menghapusnya
+    if (pendingMapLocs != null && pendingMapResult != null
+            && !mapWidgetShowing && !isCurrentCompleted()
             && !deliveryFormShowing) {
-        chatBox.getChildren().add(buildPaymentWidget(pickedIndomaret, pickedDelivery));
-        paymentWidgetShowing = true;
+        chatBox.getChildren().add(buildSellerBubble(
+            "📍 Oke! Berikut pilihan Indomaret terdekat dari alamatmu.\n" +
+            "Pilih yang paling nyaman buat kamu 👇"));
+        chatBox.getChildren().add(
+            buildLocationReplyWidget(pendingMapLocs, pendingMapResult, pendingMapCoords, new javafx.beans.property.SimpleObjectProperty<>()));
+        mapWidgetShowing = true;
     }
+
+    // Payment widget — rebuild dari state kalau Firestore update menghapusnya
+
 
     Platform.runLater(() -> chatScroll.setVvalue(1.0));
 }
-    // ============================================================
-    // BUBBLE BUILDERS
-    // ============================================================
 
     private HBox buildBuyerBubble(String text) {
         Label avatar = new Label("🧑");
@@ -760,14 +762,14 @@ private void renderChat() {
         content.setWrapText(true);
         content.setMaxWidth(320);
         content.setStyle(
-            "-fx-background-color: " + COLOR_BUYER_BUBBLE + ";" +
+            "-fx-background-color: " + UiKit.COLOR_BUYER_BUBBLE + ";" +
             "-fx-background-radius: 16 16 4 16;" +
             "-fx-padding: 10 14; -fx-font-size: 13;" +
-            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";"
+            "-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";"
         );
 
         Label time = new Label(now());
-        time.setStyle("-fx-font-size: 10; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+        time.setStyle("-fx-font-size: 10; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
 
         VBox bubble = new VBox(4, content, time);
         bubble.setAlignment(Pos.TOP_RIGHT);
@@ -786,15 +788,15 @@ private void renderChat() {
         content.setWrapText(true);
         content.setMaxWidth(380);
         content.setStyle(
-            "-fx-background-color: " + COLOR_SELLER_BUBBLE + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SELLER_BUBBLE + ";" +
             "-fx-background-radius: 16 16 16 4;" +
             "-fx-padding: 10 14; -fx-font-size: 13;" +
-            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";" +
+            "-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";" +
             "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.07),6,0,0,2);"
         );
 
         Label time = new Label(now());
-        time.setStyle("-fx-font-size: 10; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+        time.setStyle("-fx-font-size: 10; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
 
         VBox bubble = new VBox(4, content, time);
         bubble.setAlignment(Pos.TOP_LEFT);
@@ -808,18 +810,18 @@ private void renderChat() {
     private HBox buildOfferBubble(Offer o, boolean completed, Runnable onBuyAction) {
         Label header = new Label("📦  Offer dari " + (o.sellerId.isBlank() ? "Seller" : o.sellerId));
         header.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 13));
-        header.setStyle("-fx-text-fill: " + COLOR_PRIMARY + ";");
+        header.setStyle("-fx-text-fill: " + UiKit.COLOR_PRIMARY + ";");
 
         VBox card = new VBox(6, header);
 
         if (!o.sellerContact.isBlank()) {
             Label contactLbl = new Label("📞 " + o.sellerContact);
-            contactLbl.setStyle("-fx-font-size: 12; -fx-text-fill: " + COLOR_PRIMARY + "; -fx-font-weight: 600;");
+            contactLbl.setStyle("-fx-font-size: 12; -fx-text-fill: " + UiKit.COLOR_PRIMARY + "; -fx-font-weight: 600;");
             card.getChildren().add(contactLbl);
         }
 
         Separator sep1 = new Separator();
-        sep1.setStyle("-fx-background-color: " + COLOR_DIVIDER + ";");
+        sep1.setStyle("-fx-background-color: " + UiKit.COLOR_DIVIDER + ";");
         card.getChildren().add(sep1);
 
         for (OfferLine line : o.offerLines) {
@@ -827,16 +829,16 @@ private void renderChat() {
             String lineText = line.name + "   " + line.qty + " × " +
                     UiKit.rupiah(line.price) + "  =  " + UiKit.rupiah(lineTotal);
             Label ll = new Label(lineText);
-            ll.setStyle("-fx-font-size: 12; -fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+            ll.setStyle("-fx-font-size: 12; -fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
             card.getChildren().add(ll);
         }
 
         Separator sep2 = new Separator();
-        sep2.setStyle("-fx-background-color: " + COLOR_DIVIDER + ";");
+        sep2.setStyle("-fx-background-color: " + UiKit.COLOR_DIVIDER + ";");
 
         Label total = new Label("Total:  " + UiKit.rupiah(o.grandTotal));
         total.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 14));
-        total.setStyle("-fx-text-fill: " + COLOR_SUCCESS + ";");
+        total.setStyle("-fx-text-fill: " + UiKit.COLOR_SUCCESS + ";");
         card.getChildren().addAll(sep2, total);
 
         List<String> metaParts = new ArrayList<>();
@@ -845,13 +847,13 @@ private void renderChat() {
         if (o.rating > 0)          metaParts.add("⭐ " + String.format(Locale.US, "%.1f", o.rating));
         if (!metaParts.isEmpty()) {
             Label meta = new Label(String.join("  •  ", metaParts));
-            meta.setStyle("-fx-font-size: 11; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+            meta.setStyle("-fx-font-size: 11; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
             card.getChildren().add(meta);
         }
 
         Button buyBtn = new Button("🛒  Beli  " + UiKit.rupiah(o.grandTotal));
         buyBtn.setStyle(
-            "-fx-background-color: " + (completed ? "#9CA3AF" : COLOR_SUCCESS) + ";" +
+            "-fx-background-color: " + (completed ? "#9CA3AF" : UiKit.COLOR_SUCCESS) + ";" +
             "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13;" +
             "-fx-background-radius: 10; -fx-padding: 9 20; -fx-cursor: " + (completed ? "default" : "hand") + ";"
         );
@@ -862,9 +864,9 @@ private void renderChat() {
 
         card.setPadding(new Insets(12, 16, 12, 16));
         card.setStyle(
-            "-fx-background-color: " + COLOR_OFFER_BUBBLE + ";" +
+            "-fx-background-color: " + UiKit.COLOR_OFFER_BUBBLE + ";" +
             "-fx-background-radius: 12;" +
-            "-fx-border-color: " + COLOR_PRIMARY + ";" +
+            "-fx-border-color: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-border-width: 0 0 0 3;" +
             "-fx-border-radius: 0 0 0 2;"
         );
@@ -882,15 +884,15 @@ private void renderChat() {
 
         Label msg = new Label("Pesanan selesai! Gunakan tombol \"+ Request Baru\" untuk memesan lagi.");
         msg.setWrapText(true);
-        msg.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + COLOR_SUCCESS + ";");
+        msg.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + UiKit.COLOR_SUCCESS + ";");
 
         HBox banner = new HBox(10, icon, msg);
         banner.setAlignment(Pos.CENTER_LEFT);
         banner.setPadding(new Insets(12, 16, 12, 16));
         banner.setStyle(
-            "-fx-background-color: " + COLOR_COMPLETED_BG + ";" +
+            "-fx-background-color: " + UiKit.COLOR_COMPLETED_BG + ";" +
             "-fx-background-radius: 10;" +
-            "-fx-border-color: " + COLOR_SUCCESS + ";" +
+            "-fx-border-color: " + UiKit.COLOR_SUCCESS + ";" +
             "-fx-border-radius: 10; -fx-border-width: 1;"
         );
         banner.setMaxWidth(Double.MAX_VALUE);
@@ -900,7 +902,7 @@ private void renderChat() {
     private HBox buildPendingBubble(String msg) {
         Label l = new Label(msg);
         l.setStyle(
-            "-fx-text-fill: " + COLOR_TEXT_MUTED + ";" +
+            "-fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";" +
             "-fx-font-style: italic; -fx-font-size: 12;" +
             "-fx-background-color: #F9FAFB;" +
             "-fx-background-radius: 8; -fx-padding: 6 12;"
@@ -919,7 +921,7 @@ private void renderChat() {
 
     private VBox emptyChatHint(String msg) {
         Label l = new Label(msg);
-        l.setStyle("-fx-font-size: 14; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+        l.setStyle("-fx-font-size: 14; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
         l.setWrapText(true);
         l.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         VBox box = new VBox(l);
@@ -970,16 +972,16 @@ private void renderChat() {
         greetingLbl.setWrapText(true);
         greetingLbl.setMaxWidth(380);
         greetingLbl.setStyle(
-            "-fx-font-size: 13; -fx-text-fill: " + COLOR_TEXT_MAIN + ";" +
+            "-fx-font-size: 13; -fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";" +
             "-fx-font-weight: bold;"
         );
 
         Label videoTitle = new Label("📺  Link Review Produk Kami:");
-        videoTitle.setStyle("-fx-font-size: 12; -fx-font-weight: bold; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+        videoTitle.setStyle("-fx-font-size: 12; -fx-font-weight: bold; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
 
         Hyperlink ytLink = new Hyperlink(payload.videoUrl);
         ytLink.setStyle(
-            "-fx-font-size: 12; -fx-text-fill: " + COLOR_PRIMARY + ";" +
+            "-fx-font-size: 12; -fx-text-fill: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-border-color: transparent; -fx-padding: 0;"
         );
         ytLink.setOnAction(e -> {
@@ -996,7 +998,7 @@ private void renderChat() {
         videoBox.setPadding(new Insets(0, 0, 6, 0));
 
         Label catLabel = new Label("📂  Pilih kategori produk:");
-        catLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        catLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
         FlowPane categoryButtons = new FlowPane(8, 8);
         categoryButtons.setPadding(new Insets(4, 0, 4, 0));
@@ -1007,7 +1009,7 @@ private void renderChat() {
         aiBox.setStyle(
             "-fx-background-color: #EEF2FF;" +
             "-fx-background-radius: 12;" +
-            "-fx-border-color: " + COLOR_PRIMARY + ";" +
+            "-fx-border-color: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-border-width: 0 0 0 3;" +
             "-fx-border-radius: 0 0 0 2;"
         );
@@ -1019,7 +1021,7 @@ private void renderChat() {
         for (AiAutoReply.FoodCategory cat : payload.categories) {
             Button btn = new Button(cat.emoji + "  " + cat.label);
             btn.setStyle(
-                "-fx-background-color: " + COLOR_PRIMARY + ";" +
+                "-fx-background-color: " + UiKit.COLOR_PRIMARY + ";" +
                 "-fx-text-fill: white; -fx-font-size: 12; -fx-font-weight: bold;" +
                 "-fx-background-radius: 20; -fx-padding: 6 14; -fx-cursor: hand;"
             );
@@ -1111,116 +1113,30 @@ private void renderChat() {
         Platform.runLater(() -> chatScroll.setVvalue(1.0));
     }
 
-    /** @deprecated Diganti oleh onCategoryYummyInline() — tetap ada agar tidak ada compile error. */
-    @Deprecated
-    private void onCategoryYummy() {
-        onCategoryYummyInline();
-    }
 
-    /**
-     * Widget Yummy Choice — setiap item punya tombol individual dengan nama & harga.
-     * Buyer klik item → muncul form pengiriman inline.
-     */
-    private HBox buildYummyMenuButtonsWidget() {
-        Label header = new Label("😋  Yummy Choice — Pilih Produkmu:");
+    // Satu method generik menggantikan 3 method hampir identik
+    private HBox buildYummyMenuButtonsWidget()  { return buildMenuWidget("😋  Yummy Choice — Pilih Produkmu:", AiAutoReply.YUMMY_MENU,  "#FFF8EC", "#F59E0B"); }
+    private HBox buildBakeryMenuButtonsWidget() { return buildMenuWidget("🥐  Bakery — Pilih Produkmu:",        AiAutoReply.BAKERY_MENU, "#FFF5F0", "#F97316"); }
+    private HBox buildCoffeeMenuButtonsWidget() { return buildMenuWidget("☕  Coffee — Pilih Minumanmu:",       AiAutoReply.COFFEE_MENU, "#F0FDF4", "#10B981"); }
+
+    private HBox buildMenuWidget(String headerText, List<AiAutoReply.YummyMenuItem> menu,
+                                  String bgColor, String borderColor) {
+        Label header = new Label(headerText);
         header.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 14));
-        header.setStyle("-fx-text-fill: " + COLOR_PRIMARY + ";");
-        header.setWrapText(true);
-
-        // Grid tombol item: 2 kolom
-        FlowPane grid = new FlowPane(8, 8);
-        grid.setPrefWrapLength(380);
-
-        for (AiAutoReply.YummyMenuItem item : AiAutoReply.YUMMY_MENU) {
-            VBox itemBtn = buildMenuItemButton(item);
-            grid.getChildren().add(itemBtn);
-        }
-
-        VBox card = new VBox(12, header, grid);
-        card.setPadding(new Insets(14, 16, 14, 16));
-        card.setPrefWidth(440);
-        card.setMaxWidth(440);
-        card.setStyle(
-            "-fx-background-color: #FFF8EC;" +
-            "-fx-background-radius: 14;" +
-            "-fx-border-color: #F59E0B;" +
-            "-fx-border-width: 0 0 0 4;" +
-            "-fx-border-radius: 0 0 0 2;" +
-            "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.08),8,0,0,2);"
-        );
-
-        Label avatarLbl = new Label("🏪");
-        avatarLbl.setStyle("-fx-font-size: 20;");
-
-        HBox wrapper = new HBox(10, avatarLbl, card);
-        wrapper.setAlignment(Pos.TOP_LEFT);
-        wrapper.setPadding(new Insets(0, 40, 0, 0));
-        return wrapper;
-    }
-
-
-    /**
-     * Widget Bakery — tombol menu roti per item.
-     */
-    private HBox buildBakeryMenuButtonsWidget() {
-        Label header = new Label("🥐  Bakery — Pilih Produkmu:");
-        header.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 14));
-        header.setStyle("-fx-text-fill: " + COLOR_PRIMARY + ";");
+        header.setStyle("-fx-text-fill: " + UiKit.COLOR_PRIMARY + ";");
         header.setWrapText(true);
 
         FlowPane grid = new FlowPane(8, 8);
         grid.setPrefWrapLength(380);
-
-        for (AiAutoReply.YummyMenuItem item : AiAutoReply.BAKERY_MENU) {
-            grid.getChildren().add(buildMenuItemButton(item));
-        }
+        for (AiAutoReply.YummyMenuItem item : menu) grid.getChildren().add(buildMenuItemButton(item));
 
         VBox card = new VBox(12, header, grid);
         card.setPadding(new Insets(14, 16, 14, 16));
-        card.setPrefWidth(440);
-        card.setMaxWidth(440);
+        card.setPrefWidth(440); card.setMaxWidth(440);
         card.setStyle(
-            "-fx-background-color: #FFF5F0;" +
+            "-fx-background-color: " + bgColor + ";" +
             "-fx-background-radius: 14;" +
-            "-fx-border-color: #F97316;" +
-            "-fx-border-width: 0 0 0 4;" +
-            "-fx-border-radius: 0 0 0 2;" +
-            "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.08),8,0,0,2);"
-        );
-
-        Label avatarLbl = new Label("🏪");
-        avatarLbl.setStyle("-fx-font-size: 20;");
-
-        HBox wrapper = new HBox(10, avatarLbl, card);
-        wrapper.setAlignment(Pos.TOP_LEFT);
-        wrapper.setPadding(new Insets(0, 40, 0, 0));
-        return wrapper;
-    }
-
-    /**
-     * Widget Coffee — tombol menu minuman per item.
-     */
-    private HBox buildCoffeeMenuButtonsWidget() {
-        Label header = new Label("☕  Coffee — Pilih Minumanmu:");
-        header.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 14));
-        header.setStyle("-fx-text-fill: " + COLOR_PRIMARY + ";");
-        header.setWrapText(true);
-
-        FlowPane grid = new FlowPane(8, 8);
-        grid.setPrefWrapLength(380);
-
-        for (AiAutoReply.YummyMenuItem item : AiAutoReply.COFFEE_MENU) {
-            grid.getChildren().add(buildMenuItemButton(item));
-        }
-
-        VBox card = new VBox(12, header, grid);
-        card.setPadding(new Insets(14, 16, 14, 16));
-        card.setPrefWidth(440);
-        card.setMaxWidth(440);
-        card.setStyle(
-            "-fx-background-color: #F0FDF4;" +
-            "-fx-background-radius: 14;" +
-            "-fx-border-color: #10B981;" +
+            "-fx-border-color: " + borderColor + ";" +
             "-fx-border-width: 0 0 0 4;" +
             "-fx-border-radius: 0 0 0 2;" +
             "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.08),8,0,0,2);"
@@ -1238,14 +1154,14 @@ private void renderChat() {
     private VBox buildMenuItemButton(AiAutoReply.YummyMenuItem item) {
         Label nameLbl = new Label(item.name);
         nameLbl.setFont(Font.font("System", FontWeight.BOLD, 12));
-        nameLbl.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        nameLbl.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
         nameLbl.setWrapText(true);
 
         Label priceLbl = new Label(UiKit.rupiah(item.price));
-        priceLbl.setStyle("-fx-font-size: 12; -fx-font-weight: bold; -fx-text-fill: " + COLOR_SUCCESS + ";");
+        priceLbl.setStyle("-fx-font-size: 12; -fx-font-weight: bold; -fx-text-fill: " + UiKit.COLOR_SUCCESS + ";");
 
         Label descLbl = new Label(item.description);
-        descLbl.setStyle("-fx-font-size: 10; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+        descLbl.setStyle("-fx-font-size: 10; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
         descLbl.setWrapText(true);
 
         VBox card = new VBox(4, nameLbl, priceLbl, descLbl);
@@ -1255,7 +1171,7 @@ private void renderChat() {
         card.setStyle(
             "-fx-background-color: white;" +
             "-fx-background-radius: 12;" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-radius: 12; -fx-border-width: 1;" +
             "-fx-cursor: hand;" +
             "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.05),4,0,0,1);"
@@ -1263,10 +1179,10 @@ private void renderChat() {
 
         // Hover effect
         card.setOnMouseEntered(e -> card.setStyle(card.getStyle()
-            .replace("-fx-border-color: " + COLOR_DIVIDER, "-fx-border-color: " + COLOR_PRIMARY)
+            .replace("-fx-border-color: " + UiKit.COLOR_DIVIDER, "-fx-border-color: " + UiKit.COLOR_PRIMARY)
             .replace("white;", "#EEF3FF;")));
         card.setOnMouseExited(e -> card.setStyle(card.getStyle()
-            .replace("-fx-border-color: " + COLOR_PRIMARY, "-fx-border-color: " + COLOR_DIVIDER)
+            .replace("-fx-border-color: " + UiKit.COLOR_PRIMARY, "-fx-border-color: " + UiKit.COLOR_DIVIDER)
             .replace("#EEF3FF;", "white;")));
 
         card.setOnMouseClicked(e -> onYummyItemSelected(item));
@@ -1316,10 +1232,10 @@ private void renderChat() {
         // Header
         Label titleLbl = new Label("📋  Lengkapi data pengirimanmu:");
         titleLbl.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 13));
-        titleLbl.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        titleLbl.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
         Label itemInfoLbl = new Label("Pesanan: " + item.name + "  —  " + UiKit.rupiah(item.price));
-        itemInfoLbl.setStyle("-fx-font-size: 12; -fx-text-fill: " + COLOR_TEXT_MUTED + "; -fx-font-style: italic;");
+        itemInfoLbl.setStyle("-fx-font-size: 12; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + "; -fx-font-style: italic;");
 
         // Form fields
         TextField nameField  = new TextField(PREFS.get("buyerName", ""));
@@ -1337,17 +1253,17 @@ private void renderChat() {
         // Submit button
         Button submitBtn = new Button("🚀  Cari Indomaret Terdekat");
         submitBtn.setStyle(
-            "-fx-background-color: " + COLOR_PRIMARY + ";" +
+            "-fx-background-color: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13;" +
             "-fx-background-radius: 12; -fx-padding: 10 20; -fx-cursor: hand;"
         );
         submitBtn.setMaxWidth(Double.MAX_VALUE);
-        submitBtn.setOnMouseEntered(e -> submitBtn.setStyle(submitBtn.getStyle().replace(COLOR_PRIMARY, COLOR_PRIMARY_DARK)));
-        submitBtn.setOnMouseExited(e  -> submitBtn.setStyle(submitBtn.getStyle().replace(COLOR_PRIMARY_DARK, COLOR_PRIMARY)));
+        submitBtn.setOnMouseEntered(e -> submitBtn.setStyle(submitBtn.getStyle().replace(UiKit.COLOR_PRIMARY, UiKit.COLOR_PRIMARY_DARK)));
+        submitBtn.setOnMouseExited(e  -> submitBtn.setStyle(submitBtn.getStyle().replace(UiKit.COLOR_PRIMARY_DARK, UiKit.COLOR_PRIMARY)));
 
         // Loading indicator
         Label loadingLbl = new Label("⏳ Mencari lokasi terdekat...");
-        loadingLbl.setStyle("-fx-font-size: 12; -fx-text-fill: " + COLOR_TEXT_MUTED + "; -fx-font-style: italic;");
+        loadingLbl.setStyle("-fx-font-size: 12; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + "; -fx-font-style: italic;");
         loadingLbl.setVisible(false);
         loadingLbl.setManaged(false);
 
@@ -1364,9 +1280,9 @@ private void renderChat() {
         formCard.setPrefWidth(400);
         formCard.setMaxWidth(400);
         formCard.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
             "-fx-background-radius: 14;" +
-            "-fx-border-color: " + COLOR_PRIMARY + ";" +
+            "-fx-border-color: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-border-width: 1;" +
             "-fx-border-radius: 14;" +
             "-fx-effect: dropshadow(gaussian,rgba(95,91,255,0.12),12,0,0,3);"
@@ -1378,7 +1294,7 @@ private void renderChat() {
             String addr  = addrField.getText().trim();
 
             if (addr.isBlank()) {
-                addrField.setStyle(addrField.getStyle().replace(COLOR_DIVIDER, COLOR_DANGER));
+                addrField.setStyle(addrField.getStyle().replace(UiKit.COLOR_DIVIDER, UiKit.COLOR_DANGER));
                 addrField.setPromptText("⚠️ Alamat wajib diisi!");
                 return;
             }
@@ -1413,7 +1329,7 @@ private void renderChat() {
 
     private Label fieldLabel(String text) {
         Label l = new Label(text);
-        l.setStyle("-fx-font-size: 11; -fx-font-weight: bold; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+        l.setStyle("-fx-font-size: 11; -fx-font-weight: bold; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
         return l;
     }
 
@@ -1421,14 +1337,14 @@ private void renderChat() {
         tf.setPromptText(prompt);
         tf.setStyle(
             "-fx-background-color: #F9FAFB;" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-radius: 8; -fx-background-radius: 8;" +
             "-fx-padding: 8 12; -fx-font-size: 13;"
         );
         tf.setMaxWidth(Double.MAX_VALUE);
         tf.focusedProperty().addListener((o, ov, nv) -> {
-            if (nv) tf.setStyle(tf.getStyle().replace(COLOR_DIVIDER, COLOR_PRIMARY));
-            else    tf.setStyle(tf.getStyle().replace(COLOR_PRIMARY, COLOR_DIVIDER));
+            if (nv) tf.setStyle(tf.getStyle().replace(UiKit.COLOR_DIVIDER, UiKit.COLOR_PRIMARY));
+            else    tf.setStyle(tf.getStyle().replace(UiKit.COLOR_PRIMARY, UiKit.COLOR_DIVIDER));
         });
     }
 
@@ -1436,100 +1352,148 @@ private void renderChat() {
     // AFTER FORM SUBMIT — kirim ke Firestore + tampil lokasi AI
     // ============================================================
 
+    /**
+     * Form submit → langsung tampil peta pakai data fallback (instan),
+     * lalu geocode + cari Indomaret real di background dan update marker peta.
+     * Tidak ada loading spinner yang bikin user nunggu.
+     */
     private void onDeliveryFormSubmit(AiAutoReply.DeliveryFormResult result,
                                       VBox formCard, Label loadingLbl) {
         final String reqId = currentRequestId;
 
-        new Thread(() -> {
-            try {
-                // 1. Kirim data pengiriman ke Firestore — seller baca ini
-                String buyerMsg = "📋 Data Pengiriman:\n" +
-                    "Nama: "    + (result.name.isBlank()  ? "-" : result.name)  + "\n" +
-                    "HP: "      + (result.phone.isBlank() ? "-" : result.phone) + "\n" +
-                    "Alamat: "  + result.address + "\n" +
-                    "Pesanan: " + result.itemName + " (" + UiKit.rupiah(result.price) + ")";
-                if (reqId != null) fs.sendBuyerMessage(reqId, buyerId, buyerMsg);
+        // ── STEP 1: Langsung collapse form & tampil peta pakai fallback ─────
+        // Ini jalan di FX thread, instan, tidak ada network call dulu
+        Platform.runLater(() -> {
+            loadingLbl.setVisible(false);
+            loadingLbl.setManaged(false);
+            pendingItem = null;
 
-                // 2. Kirim notif ringkas ke seller
-                if (reqId != null) {
-                    fs.sendSellerMessage(reqId, "AI_BOT",
-                        "[AUTO] 📍 Buyer sedang memilih Indomaret terdekat dari: " + result.address);
-                }
+            // Collapse form jadi konfirmasi ringkas
+            formCard.getChildren().clear();
+            Label doneLbl = new Label("\u2705  Data terkirim!");
+            doneLbl.setStyle("-fx-font-size: 12; -fx-font-weight: bold; -fx-text-fill: " + UiKit.COLOR_SUCCESS + ";");
+            formCard.getChildren().add(doneLbl);
+            formCard.setStyle(
+                "-fx-background-color: " + UiKit.COLOR_COMPLETED_BG + ";" +
+                "-fx-background-radius: 14;" +
+                "-fx-border-color: " + UiKit.COLOR_SUCCESS + ";" +
+                "-fx-border-width: 1; -fx-border-radius: 14;"
+            );
 
-                // 3. Geocode alamat buyer → dapat koordinat real
-                double[] coords = AiAutoReply.geocodeAddress(result.address);
+            // Tampil peta langsung pakai fallback — user tidak nunggu
+            List<AiAutoReply.IndomaretLocation> fallback = AiAutoReply.INDOMARET_LOCATIONS;
+            chatBox.getChildren().add(buildSellerBubble(
+                "\uD83D\uDCCD Oke! Sedang mencari Indomaret terdekat dari alamatmu...\n" +
+                "Titik peta akan diperbarui sebentar lagi \uD83D\uDD04"));
 
-                if (coords == null) {
-                    // Geocoding gagal — minta buyer perjelas alamat
+            // Buat WebView holder yang bisa di-update nanti
+            javafx.beans.property.ObjectProperty<WebView> mapViewRef =
+                new javafx.beans.property.SimpleObjectProperty<>();
+            HBox mapWidget = buildLocationReplyWidget(fallback, result, null, mapViewRef);
+            chatBox.getChildren().add(mapWidget);
+            mapWidgetShowing = true;
+            pendingMapLocs   = fallback;
+            pendingMapResult = result;
+            Platform.runLater(() -> chatScroll.setVvalue(1.0));
+
+            // ── STEP 2: Geocode + cari Indomaret real di background ──────────
+            // Saat selesai, update marker di peta yang sudah tampil
+            new Thread(() -> {
+                try {
+                    // Paralel: kirim ke Firestore + geocode secara bersamaan
+                    final String buyerMsg = "\uD83D\uDCCB Data Pengiriman:\n" +
+                        "Nama: "    + (result.name.isBlank()  ? "-" : result.name)  + "\n" +
+                        "HP: "      + (result.phone.isBlank() ? "-" : result.phone) + "\n" +
+                        "Alamat: "  + result.address + "\n" +
+                        "Pesanan: " + result.itemName + " (" + UiKit.rupiah(result.price) + ")";
+
+                    // Thread Firestore (tidak blok geocoding)
+                    new Thread(() -> {
+                        try {
+                            if (reqId != null) {
+                                fs.sendBuyerMessage(reqId, buyerId, buyerMsg);
+                                fs.sendSellerMessage(reqId, "AI_BOT",
+                                    "[AUTO] \uD83D\uDCCD Buyer memilih Indomaret dari: " + result.address);
+                            }
+                        } catch (Exception ignored) {}
+                    }).start();
+
+                    // Geocode alamat buyer (max ~8 detik total dengan timeout baru)
+                    double[] coords = AiAutoReply.geocodeAddress(result.address);
+
+                    List<AiAutoReply.IndomaretLocation> real = null;
+                    if (coords != null) {
+                        real = AiAutoReply.findNearbyIndomaret(coords[0], coords[1]);
+                    }
+
+                    final double[] finalCoords = coords;
+                    final boolean realFound = (real != null && !real.isEmpty());
+                    final List<AiAutoReply.IndomaretLocation> finalLocs =
+                        realFound ? real : fallback;
+                    AiAutoReply.INDOMARET_LOCATIONS_RESOLVED = finalLocs;
+
+                    // Update peta yang sudah tampil dengan titik real
                     Platform.runLater(() -> {
-                        loadingLbl.setVisible(false);
-                        loadingLbl.setManaged(false);
-                        // Kembalikan form agar bisa diedit ulang
-                        formCard.getChildren().stream()
-                            .filter(n -> n instanceof Button || n instanceof TextField)
-                            .forEach(n -> n.setDisable(false));
-                        chatBox.getChildren().add(buildSellerBubble(
-                            "⚠️ Alamat kamu belum bisa kami temukan di peta.\n\n" +
-                            "Pastikan nama tempat / kelurahan / kota sudah tertulis, contoh:\n" +
-                            "• \"Jl. Sudirman No. 10, Jakarta Pusat\"\n" +
-                            "• \"Perumahan Cikarang Baru, Bekasi\"\n" +
-                            "• \"Kec. Cikarang Barat, Kab. Bekasi\"\n\n" +
-                            "Jangan khawatir, kamu bisa coba lagi di form di atas 👆"));
+                        // Hapus peta fallback, inject peta baru dengan data real
+                        chatBox.getChildren().remove(mapWidget);
+                        // Update bubble AI
+                        String info = realFound
+                            ? "\uD83D\uDCCD Ini dia Indomaret terdekat dari *" + result.address + "*\nPilih yang paling nyaman \uD83D\uDC47"
+                            : "\uD83D\uDCCD Ini pilihan Indomaret di area kamu!\nPilih yang paling nyaman \uD83D\uDC47";
+
+                        // Hapus bubble "sedang mencari" sebelumnya dan ganti
+                        if (!chatBox.getChildren().isEmpty()) {
+                            int last = chatBox.getChildren().size() - 1;
+                            // cari bubble "Sedang mencari" dan hapus
+                            for (int i = last; i >= Math.max(0, last - 3); i--) {
+                                javafx.scene.Node n = chatBox.getChildren().get(i);
+                                if (n instanceof HBox) {
+                                    javafx.scene.Node inner = ((HBox) n).getChildren().isEmpty()
+                                        ? null : ((HBox) n).getChildren().get(
+                                            ((HBox) n).getChildren().size() > 1 ? 1 : 0);
+                                    if (inner instanceof VBox) {
+                                        javafx.scene.Node lbl = ((VBox) inner).getChildren().isEmpty()
+                                            ? null : ((VBox) inner).getChildren().get(0);
+                                        if (lbl instanceof javafx.scene.control.Label) {
+                                            String txt = ((javafx.scene.control.Label) lbl).getText();
+                                            if (txt != null && txt.contains("Sedang mencari")) {
+                                                chatBox.getChildren().remove(i);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        chatBox.getChildren().add(buildSellerBubble(info));
+                        pendingMapLocs   = finalLocs;
+                        pendingMapCoords = finalCoords;
+                        javafx.beans.property.ObjectProperty<WebView> ref2 =
+                            new javafx.beans.property.SimpleObjectProperty<>();
+                        chatBox.getChildren().add(
+                            buildLocationReplyWidget(finalLocs, result, finalCoords, ref2));
+                        mapWidgetShowing = true;
                         Platform.runLater(() -> chatScroll.setVvalue(1.0));
                     });
-                    return;
+
+                } catch (Exception ex) {
+                    // Geocoding gagal — peta fallback yang sudah tampil tetap bisa dipakai
+                    Platform.runLater(() -> {
+                        chatBox.getChildren().remove(mapWidget);
+                        chatBox.getChildren().add(buildSellerBubble(
+                            "\uD83D\uDCCD Pilih Indomaret terdekat ya \uD83D\uDC47"));
+                        javafx.beans.property.ObjectProperty<WebView> ref3 =
+                            new javafx.beans.property.SimpleObjectProperty<>();
+                        chatBox.getChildren().add(
+                            buildLocationReplyWidget(fallback, result, null, ref3));
+                        Platform.runLater(() -> chatScroll.setVvalue(1.0));
+                    });
                 }
-
-                // 4. Cari Indomaret real via Overpass API
-                List<AiAutoReply.IndomaretLocation> nearby =
-                    AiAutoReply.findNearbyIndomaret(coords[0], coords[1]);
-
-                // Fallback ke data statis kalau Overpass gagal / kosong
-                if (nearby == null || nearby.isEmpty()) {
-                    nearby = AiAutoReply.INDOMARET_LOCATIONS;
-                }
-                AiAutoReply.INDOMARET_LOCATIONS_RESOLVED = nearby;
-
-                final double[] buyerCoords  = coords;
-                final List<AiAutoReply.IndomaretLocation> finalLocs = nearby;
-
-                Platform.runLater(() -> {
-                    loadingLbl.setVisible(false);
-                    loadingLbl.setManaged(false);
-                    pendingItem = null;
-
-                    // Collapse form card → konfirmasi ringkas
-                    formCard.getChildren().clear();
-                    Label doneLbl = new Label("✅  Data terkirim!");
-                    doneLbl.setStyle("-fx-font-size: 12; -fx-font-weight: bold; -fx-text-fill: " + COLOR_SUCCESS + ";");
-                    formCard.getChildren().add(doneLbl);
-                    formCard.setStyle(
-                        "-fx-background-color: " + COLOR_COMPLETED_BG + ";" +
-                        "-fx-background-radius: 14;" +
-                        "-fx-border-color: " + COLOR_SUCCESS + ";" +
-                        "-fx-border-width: 1; -fx-border-radius: 14;"
-                    );
-
-                    // AI bubble sebelum peta
-                    chatBox.getChildren().add(buildSellerBubble(
-                        "📍 Oke! Berikut pilihan Indomaret terdekat dari alamatmu.\n" +
-                        "Pilih yang paling nyaman buat kamu 👇"));
-
-                    // 5. Render widget peta dengan koordinat buyer yang real
-                    chatBox.getChildren().add(
-                        buildLocationReplyWidget(finalLocs, result, buyerCoords));
-                    Platform.runLater(() -> chatScroll.setVvalue(1.0));
-                });
-
-            } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    loadingLbl.setVisible(false);
-                    loadingLbl.setManaged(false);
-                    showError("Gagal mengirim data", ex.getMessage());
-                });
-            }
-        }).start();
+            }).start();
+        });
     }
+
 
     /**
      * Widget balasan lokasi — GMaps-style card per Indomaret.
@@ -1540,13 +1504,14 @@ private void renderChat() {
 
     private HBox buildLocationReplyWidget(List<AiAutoReply.IndomaretLocation> locs,
                                            AiAutoReply.DeliveryFormResult result,
-                                           double[] buyerCoords) {
+                                           double[] buyerCoords,
+                                           javafx.beans.property.ObjectProperty<WebView> outRef) {
         Label avatarLbl = new Label("\uD83C\uDFEA");
         avatarLbl.setStyle("-fx-font-size: 20;");
 
         Label headerLbl = new Label("\uD83D\uDCCD  Pilih Indomaret terdekat:");
         headerLbl.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 13));
-        headerLbl.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        headerLbl.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
         // Center peta di lokasi BUYER, bukan rata-rata Indomaret
         double centerLat = (buyerCoords != null) ? buyerCoords[0]
@@ -1612,13 +1577,17 @@ private void renderChat() {
         WebView webView = new WebView();
         webView.setPrefSize(420, 260);
         webView.setMaxWidth(420);
+        if (outRef != null) outRef.set(webView); // caller bisa update marker nanti
         WebEngine engine = webView.getEngine();
+        engine.setJavaScriptEnabled(true);
+        engine.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
         VBox listPanel = new VBox(8);
         listPanel.setPadding(new Insets(8, 0, 0, 0));
         for (int i = 0; i < locs.size(); i++) {
             final AiAutoReply.IndomaretLocation loc = locs.get(i);
-            listPanel.getChildren().add(buildLocationCard(loc, i + 1, result,
+            final int rank = i + 1;
+            listPanel.getChildren().add(buildLocationCard(loc, rank, result,
                 () -> onIndomaretPicked(loc, result, webView)));
         }
 
@@ -1627,7 +1596,7 @@ private void renderChat() {
         card.setPrefWidth(450);
         card.setMaxWidth(450);
         card.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
             "-fx-background-radius: 14;" +
             "-fx-border-color: #10B981;" +
             "-fx-border-width: 0 0 0 4;" +
@@ -1635,7 +1604,18 @@ private void renderChat() {
             "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.08),8,0,0,2);"
         );
 
+        // Load setelah WebView masuk scene graph — ini kunci supaya peta muncul
+        final String htmlFinal = html;
+        webView.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null && engine.getLoadWorker().getState()
+                    == javafx.concurrent.Worker.State.READY) {
+                engine.loadContent(htmlFinal);
+            }
+        });
+
+        // Fallback: kalau sudah di scene, load langsung
         engine.loadContent(html);
+
         engine.getLoadWorker().stateProperty().addListener((obs, oldS, newS) -> {
             if (newS == javafx.concurrent.Worker.State.SUCCEEDED) {
                 JSObject win = (JSObject) engine.executeScript("window");
@@ -1647,6 +1627,9 @@ private void renderChat() {
                         }
                     }
                 });
+            } else if (newS == javafx.concurrent.Worker.State.FAILED) {
+                // Kalau gagal load (misal network issue), coba reload sekali
+                Platform.runLater(() -> engine.loadContent(htmlFinal));
             }
         });
 
@@ -1656,228 +1639,60 @@ private void renderChat() {
         return wrapper;
     }
 
-    private void onIndomaretPicked(AiAutoReply.IndomaretLocation loc,
-                                    AiAutoReply.DeliveryFormResult result, WebView mapView) {
-        final String reqId = currentRequestId;
 
-        // Kirim info ke Firestore (seller lihat)
-        new Thread(() -> {
-            try {
-                String msg = "📍 Buyer memilih Indomaret: " + loc.name +
-                    "\n📌 " + loc.address +
-                    "\n🚶 " + loc.distanceMinutes + " menit  ·  ⭐ " +
-                    String.format(java.util.Locale.US, "%.1f", loc.rating) +
-                    "\nPesanan: " + result.itemName + " (" + UiKit.rupiah(result.price) + ")" +
-                    "\nNama: " + result.name + "  |  HP: " + result.phone;
-                if (reqId != null) fs.sendBuyerMessage(reqId, buyerId, msg);
-            } catch (Exception ignored) {}
-        }).start();
+    /**
+     * Card satu baris per lokasi Indomaret di bawah peta Leaflet.
+     */
+    private HBox buildLocationCard(AiAutoReply.IndomaretLocation loc, int rank,
+                                    AiAutoReply.DeliveryFormResult result,
+                                    Runnable onPick) {
+        String medal = rank == 1 ? "\uD83E\uDD47" : rank == 2 ? "\uD83E\uDD48" : "\uD83E\uDD49";
 
-        // Bubble buyer konfirmasi + widget payment langsung
-        Platform.runLater(() -> {
-            if (mapView != null) mapView.setDisable(true);
+        Label nameLbl = new Label(medal + "  " + loc.name);
+        nameLbl.setFont(Font.font("System", FontWeight.BOLD, 13));
+        nameLbl.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
-            // Bubble buyer konfirmasi pilihan
-            chatBox.getChildren().add(buildBuyerBubble(
-                "✅ Saya pilih " + loc.name + "\n📌 " + loc.address));
-
-            // Simpan state
-            pickedIndomaret      = loc;
-            pickedDelivery       = result;
-            paymentWidgetShowing = false;
-
-            // Widget pembayaran langsung (greeting ada di dalam widget)
-            chatBox.getChildren().add(buildPaymentWidget(loc, result));
-            paymentWidgetShowing = true;
-
-            Platform.runLater(() -> chatScroll.setVvalue(1.0));
-        });
-    }
-
-    // ============================================================
-    // PAYMENT WIDGET — step 10: pilih metode bayar
-    // ============================================================
-
-    private HBox buildPaymentWidget(AiAutoReply.IndomaretLocation loc,
-                                    AiAutoReply.DeliveryFormResult result) {
-        Label avatarLbl = new Label("🏪");
-        avatarLbl.setStyle("-fx-font-size: 20;");
-
-        Label titleLbl = new Label("💳  Pilih metode pembayaran:");
-        titleLbl.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 13));
-        titleLbl.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
-
-        Label summaryLbl = new Label(
-            "📦 " + result.itemName + " — " + UiKit.rupiah(result.price) +
-            "\n🏪 " + loc.name);
-        summaryLbl.setStyle("-fx-font-size: 12; -fx-text-fill: " + COLOR_TEXT_MUTED + "; -fx-font-style: italic;");
-        summaryLbl.setWrapText(true);
-
-        // 4 tombol metode pembayaran
-        record PayMethod(String emoji, String label, String key) {}
-        List<PayMethod> methods = List.of(
-            new PayMethod("🔲", "QRIS",    "qris"),
-            new PayMethod("🏦", "Transfer Bank", "bank"),
-            new PayMethod("💚", "E-Wallet",      "ewallet"),
-            new PayMethod("💵", "COD (Tunai)",   "cod")
-        );
-
-        FlowPane btnPane = new FlowPane(10, 10);
-        btnPane.setPadding(new Insets(6, 0, 0, 0));
-
-        for (PayMethod m : methods) {
-            Button btn = new Button(m.emoji + "  " + m.label);
-            btn.setStyle(
-                "-fx-background-color: white;" +
-                "-fx-text-fill: " + COLOR_TEXT_MAIN + "; -fx-font-size: 13; -fx-font-weight: bold;" +
-                "-fx-background-radius: 12; -fx-padding: 10 18; -fx-cursor: hand;" +
-                "-fx-border-color: " + COLOR_PRIMARY + "; -fx-border-width: 2; -fx-border-radius: 12;"
-            );
-            btn.setOnMouseEntered(e -> btn.setStyle(btn.getStyle()
-                .replace("white", "#EEF2FF")));
-            btn.setOnMouseExited(e -> btn.setStyle(btn.getStyle()
-                .replace("#EEF2FF", "white")));
-            btn.setOnAction(e -> {
-                // Disable semua tombol setelah dipilih
-                btnPane.getChildren().forEach(node -> node.setDisable(true));
-                btn.setStyle(btn.getStyle()
-                    .replace("white", "#4F46E5")
-                    .replace(COLOR_TEXT_MAIN, "white"));
-                onPaymentSelected(m.key, m.label, loc, result);
-            });
-            btnPane.getChildren().add(btn);
-        }
-
-        // Greeting AI langsung di atas tombol
-        Label greetLbl = new Label("🎉 Mantap! Sekarang pilih metode pembayaranmu:");
-        greetLbl.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 13));
-        greetLbl.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
-        greetLbl.setWrapText(true);
-
-        VBox card = new VBox(10, greetLbl, new Separator(), titleLbl, summaryLbl, new Separator(), btnPane);
-        card.setPadding(new Insets(14, 16, 14, 16));
-        card.setPrefWidth(420);
-        card.setMaxWidth(420);
-        card.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-background-radius: 14;" +
-            "-fx-border-color: #F59E0B;" +
-            "-fx-border-width: 0 0 0 4;" +
-            "-fx-border-radius: 0 0 0 2;" +
-            "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.08),8,0,0,2);"
-        );
-
-        HBox wrapper = new HBox(10, avatarLbl, card);
-        wrapper.setAlignment(Pos.TOP_LEFT);
-        wrapper.setPadding(new Insets(4, 30, 4, 0));
-        return wrapper;
-    }
-
-    /** Step 11: buyer pilih metode bayar → step 12: AI konfirmasi + complete request */
-    private void onPaymentSelected(String methodKey, String methodLabel,
-                                   AiAutoReply.IndomaretLocation loc,
-                                   AiAutoReply.DeliveryFormResult result) {
-        final String reqId = currentRequestId;
-
-        // Bubble buyer: "Saya bayar pakai X"
-        chatBox.getChildren().add(buildBuyerBubble("💳 Bayar pakai " + methodLabel));
-
-        // Bubble AI konfirmasi langsung
-        String konfirmasi = "✅ Baik, pesananmu sudah dikonfirmasi! Mohon ditunggu ya 🙏\n\n" +
-            "📦 " + result.itemName + " — " + UiKit.rupiah(result.price) + "\n" +
-            "🏪 " + loc.name + "\n" +
-            "💳 Metode: " + methodLabel + "\n" +
-            ("cod".equals(methodKey)
-                ? "📞 Seller segera menghubungi " + (result.phone.isBlank() ? "kamu" : result.phone) + "."
-                : "📞 Seller akan mengirim instruksi pembayaran ke " +
-                  (result.phone.isBlank() ? "kamu" : result.phone) + " segera.");
-        chatBox.getChildren().add(buildSellerBubble(konfirmasi));
-        Platform.runLater(() -> chatScroll.setVvalue(1.0));
-
-        setStatus("Memproses pesanan...", "warn");
-
-        // Kirim ke Firestore + complete request di background
-        new Thread(() -> {
-            try {
-                if (reqId == null) return;
-
-                // Ringkasan ke seller
-                String sellerNote = "💳 Buyer memilih pembayaran: " + methodLabel +
-                    "\n📦 " + result.itemName + " (" + UiKit.rupiah(result.price) + ")" +
-                    "\n🏪 " + loc.name +
-                    "\n👤 " + result.name + " | 📞 " + result.phone +
-                    "\n📌 Alamat: " + result.address;
-                fs.sendBuyerMessage(reqId, buyerId, sellerNote);
-
-                fs.sendSellerMessage(reqId, "AI_BOT", "[AUTO] 🧾 RINGKASAN PESANAN:\n" +
-                    "Pembayaran: " + methodLabel + "\n" +
-                    "Item: " + result.itemName + " (" + UiKit.rupiah(result.price) + ")\n" +
-                    "Indomaret: " + loc.name + "\n" +
-                    "Buyer: " + result.name + " | " + result.phone + "\n" +
-                    "Alamat: " + result.address);
-
-                // Tandai request COMPLETED
-                fs.completeRequestWithQuantity(reqId, "", result.name, result.address, result.price);
-
-                Platform.runLater(() -> {
-                    requestStatusById.put(reqId, "COMPLETED");
-                    currentRequestStatus = "COMPLETED";
-                    updateInputState();
-                    renderChat();
-                    showCompletedToast(result.price);
-                });
-
-            } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    setStatus("Error ❌", "error");
-                    showError("Gagal menyelesaikan pesanan", ex.getMessage());
-                });
-            }
-        }).start();
-    }
-
-    private VBox buildLocationCard(AiAutoReply.IndomaretLocation loc, int rank,
-                                   AiAutoReply.DeliveryFormResult result, Runnable onPick) {
-        String starsStr = "\u2B50 " + String.format(java.util.Locale.US, "%.1f", loc.rating);
-        String rankText = rank == 1 ? "\uD83E\uDD47 Terdekat" : rank == 2 ? "\uD83E\uDD48 Alternatif" : "\uD83E\uDD49 Pilihan lain";
-        String rankBg   = rank == 1 ? "#FEF3C7" : "#F3F4F6";
-        String rankFg   = rank == 1 ? "#92400E" : COLOR_TEXT_MUTED;
-
-        Label rankLbl = new Label(rankText);
-        rankLbl.setStyle("-fx-background-color:" + rankBg + ";-fx-text-fill:" + rankFg +
-            ";-fx-font-size:10;-fx-font-weight:bold;-fx-background-radius:8;-fx-padding:2 8;");
-
-        Label nameLbl = new Label("\uD83C\uDFEA  " + loc.name);
-        nameLbl.setFont(Font.font("System", FontWeight.BOLD, 12));
-        nameLbl.setStyle("-fx-text-fill:" + COLOR_TEXT_MAIN + ";");
-        nameLbl.setWrapText(true);
-
-        Label addrLbl = new Label("\uD83D\uDCCC  " + loc.address);
-        addrLbl.setStyle("-fx-font-size:11;-fx-text-fill:" + COLOR_TEXT_MUTED + ";");
+        Label addrLbl = new Label("\uD83D\uDCCC " + loc.address);
+        addrLbl.setStyle("-fx-font-size: 11; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
         addrLbl.setWrapText(true);
 
-        Label metaLbl = new Label("\uD83D\uDEB6 " + loc.distanceMinutes + " mnt  \u00b7  " +
-            starsStr + "  \u00b7  \uD83D\uDD50 " + loc.operationalHours);
-        metaLbl.setStyle("-fx-font-size:11;-fx-text-fill:" + COLOR_TEXT_MUTED + ";");
+        Label metaLbl = new Label(
+            "\uD83D\uDEB6 " + loc.distanceMinutes + " mnt  \u00b7  \u2B50 " +
+            String.format(java.util.Locale.US, "%.1f", loc.rating) +
+            "  \u00b7  \uD83D\uDD50 " + loc.operationalHours);
+        metaLbl.setStyle("-fx-font-size: 11; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
 
-        Button pickBtn = new Button("\u2705  Pilih Indomaret ini");
-        pickBtn.setStyle("-fx-background-color:#4F46E5;-fx-text-fill:white;" +
-            "-fx-font-weight:bold;-fx-font-size:12;-fx-background-radius:8;" +
-            "-fx-padding:7 16;-fx-cursor:hand;");
-        pickBtn.setMaxWidth(Double.MAX_VALUE);
-        pickBtn.setOnMouseEntered(e -> pickBtn.setStyle(pickBtn.getStyle().replace("#4F46E5","#3730A3")));
-        pickBtn.setOnMouseExited(e  -> pickBtn.setStyle(pickBtn.getStyle().replace("#3730A3","#4F46E5")));
-        pickBtn.setOnAction(e -> { pickBtn.setDisable(true); onPick.run(); });
+        Button pickBtn = new Button("\u2705 Pilih");
+        pickBtn.setStyle(
+            "-fx-background-color: " + UiKit.COLOR_PRIMARY + ";" +
+            "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12;" +
+            "-fx-background-radius: 8; -fx-padding: 5 14; -fx-cursor: hand;"
+        );
+        pickBtn.setOnMouseEntered(e -> pickBtn.setOpacity(0.85));
+        pickBtn.setOnMouseExited(e  -> pickBtn.setOpacity(1.0));
+        pickBtn.setOnAction(e -> {
+            pickBtn.setDisable(true);
+            onPick.run();
+        });
 
-        VBox card = new VBox(5, rankLbl, nameLbl, addrLbl, metaLbl, pickBtn);
+        VBox textCol = new VBox(3, nameLbl, addrLbl, metaLbl);
+        HBox.setHgrow(textCol, Priority.ALWAYS);
+
+        HBox card = new HBox(12, textCol, pickBtn);
+        card.setAlignment(Pos.CENTER_LEFT);
         card.setPadding(new Insets(10, 12, 10, 12));
         card.setStyle(
-            "-fx-background-color:" + (rank == 1 ? "#F0FDF4" : "#F9FAFB") + ";" +
-            "-fx-background-radius:10;" +
-            "-fx-border-color:" + (rank == 1 ? "#86EFAC" : COLOR_DIVIDER) + ";" +
-            "-fx-border-radius:10;-fx-border-width:1;"
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-background-radius: 10;" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
+            "-fx-border-radius: 10; -fx-border-width: 1;" +
+            "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.05),4,0,0,1);"
         );
-        return card;
+
+        HBox row = new HBox(card);
+        row.setPadding(new Insets(2, 0, 2, 0));
+        HBox.setHgrow(card, Priority.ALWAYS);
+        return row;
     }
 
     // ============================================================
@@ -1940,8 +1755,10 @@ private void renderChat() {
                     showCompletedToast(offer.grandTotal);
                 });
             } catch (Exception ex) {
-                setStatus("Error ❌", "error");
-                showError("Gagal menyelesaikan pesanan", ex.getMessage());
+                Platform.runLater(() -> {
+                    setStatus("Error ❌", "error");
+                    showError("Gagal menyelesaikan pesanan", ex.getMessage());
+                });
             }
         }).start();
     }
@@ -1963,7 +1780,7 @@ private void renderChat() {
 
         ProgressBar bar = new ProgressBar(1.0);
         bar.setMaxWidth(Double.MAX_VALUE);
-        bar.setStyle("-fx-accent: " + COLOR_SUCCESS + "; -fx-pref-height: 3;");
+        bar.setStyle("-fx-accent: " + UiKit.COLOR_SUCCESS + "; -fx-pref-height: 3;");
 
         VBox toast = new VBox(8, content, bar);
         toast.setPadding(new Insets(14, 18, 12, 16));
@@ -2036,17 +1853,17 @@ private void renderChat() {
         RequestCell() {
             root.setPadding(new Insets(10, 14, 10, 14));
             title.setFont(Font.font("System", FontWeight.BOLD, 13));
-            title.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+            title.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
             badge.setStyle(
-                "-fx-background-color: " + COLOR_SUCCESS + ";" +
+                "-fx-background-color: " + UiKit.COLOR_SUCCESS + ";" +
                 "-fx-text-fill: white; -fx-font-size: 9; -fx-font-weight: bold;" +
                 "-fx-background-radius: 6; -fx-padding: 1 5;"
             );
             badge.setVisible(false);
             badge.setManaged(false);
 
-            preview.setStyle("-fx-font-size: 11; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+            preview.setStyle("-fx-font-size: 11; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
             preview.setWrapText(false);
 
             topRow.setAlignment(Pos.CENTER_LEFT);
@@ -2054,7 +1871,7 @@ private void renderChat() {
             root.getChildren().addAll(topRow, preview);
 
             setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
-            setOnMouseEntered(e -> { if (!isSelected()) root.setStyle("-fx-background-color: " + COLOR_BG + "; -fx-background-radius: 8;"); });
+            setOnMouseEntered(e -> { if (!isSelected()) root.setStyle("-fx-background-color: " + UiKit.COLOR_BG + "; -fx-background-radius: 8;"); });
             setOnMouseExited(e  -> { if (!isSelected()) root.setStyle("-fx-background-color: transparent;"); });
         }
 
@@ -2076,16 +1893,16 @@ private void renderChat() {
 
             if (isSelected()) {
                 root.setStyle(
-                    "-fx-background-color: " + COLOR_SELECTED_ROW + ";" +
+                    "-fx-background-color: " + UiKit.COLOR_SELECTED_ROW + ";" +
                     "-fx-background-radius: 8;" +
-                    "-fx-border-color: " + COLOR_PRIMARY + ";" +
+                    "-fx-border-color: " + UiKit.COLOR_PRIMARY + ";" +
                     "-fx-border-width: 0 0 0 3;" +
                     "-fx-border-radius: 0;"
                 );
-                title.setStyle("-fx-text-fill: " + COLOR_PRIMARY + "; -fx-font-weight: bold;");
+                title.setStyle("-fx-text-fill: " + UiKit.COLOR_PRIMARY + "; -fx-font-weight: bold;");
             } else {
                 root.setStyle("-fx-background-color: transparent;");
-                title.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + "; -fx-font-weight: bold;");
+                title.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + "; -fx-font-weight: bold;");
             }
             setOpacity(completed ? 0.85 : 1.0);
             setGraphic(root);
@@ -2184,5 +2001,65 @@ private void renderChat() {
             this.rating        = rating;
             this.sellerContact = sellerContact == null ? "" : sellerContact;
         }
+
+        
     }
+    /**
+     * Buyer klik pilih Indomaret → konfirmasi final, tidak ada step payment.
+     */
+    private void onIndomaretPicked(AiAutoReply.IndomaretLocation loc,
+                                    AiAutoReply.DeliveryFormResult result, WebView mapView) {
+        final String reqId = currentRequestId;
+
+        Platform.runLater(() -> {
+            if (mapView != null) mapView.setDisable(true);
+
+            chatBox.getChildren().add(buildBuyerBubble(
+                "\u2705 Saya pilih " + loc.name + "\n\uD83D\uDCCC " + loc.address));
+
+            String konfirmasi =
+                "\uD83D\uDCE6 Baik, pesananmu sudah diterima! Mohon ditunggu ya \uD83D\uDE4F\n\n" +
+                "\uD83C\uDFEA " + loc.name + "\n" +
+                "\uD83D\uDCCC " + loc.address + "\n" +
+                "\uD83D\uDED2 " + result.itemName + " \u2014 " + UiKit.rupiah(result.price) + "\n\n" +
+                "\uD83D\uDCB3 Nanti saat makanan datang, kamu bisa lakukan proses payment " +
+                "langsung ke kurir atau di kasir Indomaret ya. Selamat menikmati! \uD83D\uDE0A";
+            chatBox.getChildren().add(buildSellerBubble(konfirmasi));
+            Platform.runLater(() -> chatScroll.setVvalue(1.0));
+            setStatus("Memproses pesanan...", "warn");
+        });
+
+        new Thread(() -> {
+            try {
+                if (reqId == null) return;
+                String msg = "\uD83D\uDCCD Buyer memilih Indomaret: " + loc.name +
+                    "\n\uD83D\uDCCC " + loc.address +
+                    "\n\uD83D\uDED2 " + result.itemName + " (" + UiKit.rupiah(result.price) + ")" +
+                    "\n\uD83D\uDC64 " + result.name + " | \uD83D\uDCDE " + result.phone +
+                    "\n\uD83D\uDCE6 Pesanan SELESAI dikonfirmasi.";
+                fs.sendBuyerMessage(reqId, buyerId, msg);
+                fs.sendSellerMessage(reqId, "AI_BOT",
+                    "[AUTO] \uD83E\uDDE3 PESANAN MASUK:\n" +
+                    "Item: " + result.itemName + " (" + UiKit.rupiah(result.price) + ")\n" +
+                    "Indomaret: " + loc.name + "\n" +
+                    "Buyer: " + result.name + " | " + result.phone + "\n" +
+                    "Alamat: " + result.address + "\n" +
+                    "\uD83D\uDCB3 Payment dilakukan saat barang tiba.");
+                fs.completeRequestWithQuantity(reqId, "", result.name, result.address, result.price);
+                Platform.runLater(() -> {
+                    requestStatusById.put(reqId, "COMPLETED");
+                    currentRequestStatus = "COMPLETED";
+                    updateInputState();
+                    renderChat();
+                    showCompletedToast(result.price);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    setStatus("Error \u274C", "error");
+                    showError("Gagal menyelesaikan pesanan", ex.getMessage());
+                });
+            }
+        }).start();
+    }
+
 }

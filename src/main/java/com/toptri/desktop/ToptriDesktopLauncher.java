@@ -54,6 +54,11 @@ public class ToptriDesktopLauncher extends Application {
     }
 
     public static void main(String[] args) {
+        // Izinkan WebView load resource dari CDN (Leaflet maps)
+        System.setProperty("sun.net.http.allowRestrictedHeaders", "true");
+        System.setProperty("javafx.web.page.properties.allowFileAccess", "true");
+        // Disable SSL certificate check supaya HTTPS CDN bisa diakses
+        System.setProperty("com.sun.webkit.network.CookieHandler", "none");
         launch(args);
     }
 }

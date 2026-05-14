@@ -1,16 +1,23 @@
 package com.toptri.desktop;
 
+import javafx.animation.FadeTransition;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.util.Duration;
+
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class UiKit {
 
@@ -238,6 +245,202 @@ public class UiKit {
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
     }
+
+    // ============================================================
+    // CHAT BUBBLE BUILDERS
+    // ============================================================
+
+    /**
+     * Bubble pesan dari buyer — rata kiri, avatar 🧑 di sebelah kiri.
+     */
+    public static HBox buildBuyerBubble(String text) {
+        Label avatar = new Label("🧑");
+        avatar.setStyle("-fx-font-size: 20;");
+
+        Label content = new Label(text);
+        content.setWrapText(true);
+        content.setMaxWidth(320);
+        content.setStyle(
+            "-fx-background-color: " + COLOR_BUYER_BUBBLE + ";" +
+            "-fx-background-radius: 16 16 16 4;" +
+            "-fx-padding: 10 14;" +
+            "-fx-font-size: 13;" +
+            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";"
+        );
+
+        Label time = new Label(now());
+        time.setStyle("-fx-font-size: 10; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+
+        VBox bubble = new VBox(4, content, time);
+        bubble.setAlignment(Pos.TOP_LEFT);
+
+        HBox row = new HBox(10, avatar, bubble);
+        row.setAlignment(Pos.TOP_LEFT);
+        row.setPadding(new Insets(2, 60, 2, 0));
+        return row;
+    }
+
+    /**
+     * Bubble pesan dari seller — rata kanan, avatar 🏪 di sebelah kanan.
+     */
+    public static HBox buildSellerBubble(String text) {
+        Label avatar = new Label("🏪");
+        avatar.setStyle("-fx-font-size: 20;");
+
+        Label content = new Label(text);
+        content.setWrapText(true);
+        content.setMaxWidth(320);
+        content.setStyle(
+            "-fx-background-color: " + COLOR_SELLER_BUBBLE + ";" +
+            "-fx-background-radius: 16 16 4 16;" +
+            "-fx-padding: 10 14;" +
+            "-fx-font-size: 13;" +
+            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";" +
+            "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.07),6,0,0,2);"
+        );
+
+        Label time = new Label(now());
+        time.setStyle("-fx-font-size: 10; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+
+        VBox bubble = new VBox(4, content, time);
+        bubble.setAlignment(Pos.TOP_RIGHT);
+
+        HBox row = new HBox(10, bubble, avatar);
+        row.setAlignment(Pos.TOP_RIGHT);
+        row.setPadding(new Insets(2, 0, 2, 60));
+        return row;
+    }
+
+    /**
+     * Bubble khusus pesan otomatis AI — rata kiri, ikon 🤖, badge "AUTO · AI".
+     */
+    public static HBox buildAiNotifBubble(String text) {
+        Label icon = new Label("🤖");
+        icon.setStyle("-fx-font-size: 16;");
+
+        Label content = new Label(text);
+        content.setWrapText(true);
+        content.setMaxWidth(340);
+        content.setStyle(
+            "-fx-font-size: 12; -fx-text-fill: #4338CA;" +
+            "-fx-font-style: italic;"
+        );
+
+        Label badge = new Label("AUTO · AI");
+        badge.setStyle(
+            "-fx-background-color: #EEF2FF;" +
+            "-fx-text-fill: #6366F1; -fx-font-size: 9; -fx-font-weight: bold;" +
+            "-fx-background-radius: 6; -fx-padding: 1 5;"
+        );
+
+        Label time = new Label(now());
+        time.setStyle("-fx-font-size: 10; -fx-text-fill: #A5B4FC;");
+
+        HBox topRow = new HBox(6, badge, time);
+        topRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox bubble = new VBox(3, topRow, content);
+        bubble.setPadding(new Insets(6, 10, 6, 10));
+        bubble.setStyle(
+            "-fx-background-color: #EEF2FF;" +
+            "-fx-background-radius: 10;" +
+            "-fx-border-color: #C7D2FE;" +
+            "-fx-border-radius: 10; -fx-border-width: 1;"
+        );
+
+        HBox row = new HBox(6, icon, bubble);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(2, 40, 2, 4));
+        return row;
+    }
+
+    /**
+     * Bubble "menunggu offer" — tampil di bawah pesan buyer saat belum ada offer.
+     */
+    public static HBox buildPendingBubble(String msg) {
+        Label l = new Label("⏳  " + msg);
+        l.setStyle(
+            "-fx-text-fill: " + COLOR_TEXT_MUTED + ";" +
+            "-fx-font-style: italic; -fx-font-size: 12;" +
+            "-fx-background-color: #F9FAFB;" +
+            "-fx-background-radius: 8; -fx-padding: 6 12;"
+        );
+        HBox row = new HBox(l);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(0, 60, 0, 46));
+        return row;
+    }
+
+    // ============================================================
+    // CHAT LAYOUT HELPERS
+    // ============================================================
+
+    /** Spacer tipis antar grup pesan di chat. */
+    public static Region chatDivider() {
+        Region r = new Region();
+        r.setMinHeight(6);
+        return r;
+    }
+
+    /**
+     * Placeholder centered di area chat (kosong / loading).
+     * Caller perlu VBox.setVgrow(result, Priority.ALWAYS) agar mengisi ruang.
+     */
+    public static VBox emptyChatHint(String msg) {
+        Label l = new Label(msg);
+        l.setStyle("-fx-font-size: 14; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+        VBox box = new VBox(l);
+        box.setAlignment(Pos.CENTER);
+        box.setPadding(new Insets(60));
+        VBox.setVgrow(box, Priority.ALWAYS);
+        return box;
+    }
+
+    // ============================================================
+    // TOAST NOTIFICATION
+    // ============================================================
+
+    /**
+     * Tampilkan toast teks sederhana yang auto-dismiss setelah 3 detik.
+     *
+     * @param toastContainer VBox overlay (biasanya TOP_RIGHT, padding 70,16,0,0)
+     * @param message        teks yang ditampilkan
+     */
+    public static void showToast(VBox toastContainer, String message) {
+        Label msg = new Label(message);
+        msg.setStyle("-fx-text-fill: white; -fx-font-size: 12; -fx-font-weight: bold;");
+
+        VBox toast = new VBox(msg);
+        toast.setPadding(new Insets(10, 16, 10, 16));
+        toast.setStyle(
+            "-fx-background-color: " + COLOR_NOTIF_BG + ";" +
+            "-fx-background-radius: 10;" +
+            "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.20),8,0,0,2);"
+        );
+
+        toastContainer.getChildren().add(0, toast);
+        PauseTransition pause = new PauseTransition(Duration.seconds(3));
+        pause.setOnFinished(e -> {
+            FadeTransition ft = new FadeTransition(Duration.millis(250), toast);
+            ft.setFromValue(1); ft.setToValue(0);
+            ft.setOnFinished(ev -> toastContainer.getChildren().remove(toast));
+            ft.play();
+        });
+        pause.play();
+    }
+
+    // ============================================================
+    // TIME UTIL
+    // ============================================================
+
+    /** Waktu sekarang dalam format "HH:mm", dipakai di timestamp bubble. */
+    public static String now() {
+        return LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+    }
+
+    // ============================================================
+    // EXISTING HELPERS — menu card
+    // ============================================================
 
     public static VBox menuCard(String name, String subtitle) {
         VBox box = new VBox(2);

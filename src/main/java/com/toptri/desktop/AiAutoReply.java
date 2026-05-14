@@ -33,7 +33,7 @@ public class AiAutoReply {
     public static String getModel()           { return ollamaModel; }
 
     /** Berapa lama tunggu seller sebelum AI auto-reply (ms). */
-    public static final long SELLER_GRACE_MS = 500;
+    public static final long SELLER_GRACE_MS = 0;
 
     // ── Video review toko ─────────────────────────────────────────
     /**
@@ -81,27 +81,26 @@ public class AiAutoReply {
         new YummyMenuItem("Squash",     10_000, "Minuman segar buah-buahan dengan rasa manis asam")
     );
 
-    // ── Indomaret locations (hardcoded, ganti sesuai kota kamu) ──
-    /**
-     * Daftar lokasi Indomaret untuk ditampilkan setelah buyer isi form alamat.
-     * Ganti koordinat lat/lng dan nama sesuai kota kamu.
-     * distanceMinutes = estimasi jalan kaki dalam menit.
-     */
     public static final List<IndomaretLocation> INDOMARET_LOCATIONS = List.of(
         new IndomaretLocation(
-            "Indomaret Jl. Sudirman No. 12",
-            "Jl. Jend. Sudirman No. 12, Jakarta Pusat",
-            -6.2088, 106.8456, 5, "06:00 – 23:00", 4.7
+            "Indomaret Jl. Sudirman No. 12",          // ← ganti nama toko
+            "Jl. Jend. Sudirman No. 12, Jakarta Pusat", // ← ganti alamat
+            -6.2088, 106.8456,                         // ← ganti lat, lng (dari Google Maps)
+            5,                                          // ← estimasi menit jalan kaki
+            "06:00 – 23:00",                           // ← jam buka
+            4.7                                         // ← rating
         ),
         new IndomaretLocation(
             "Indomaret Jl. Thamrin No. 8",
             "Jl. M.H. Thamrin No. 8, Jakarta Pusat",
-            -6.1954, 106.8230, 8, "07:00 – 22:00", 4.5
+            -6.1954, 106.8230,
+            8, "07:00 – 22:00", 4.5
         ),
         new IndomaretLocation(
             "Indomaret Jl. Gatot Subroto",
             "Jl. Gatot Subroto No. 55, Jakarta Selatan",
-            -6.2297, 106.8198, 12, "24 jam", 4.3
+            -6.2297, 106.8198,
+            12, "24 jam", 4.3
         )
     );
 
@@ -112,10 +111,6 @@ public class AiAutoReply {
             t.setDaemon(true);
             return t;
         });
-
-    // ─────────────────────────────────────────────────────────────
-    // maybeAutoReply — dipanggil BuyerWindow setiap buyer kirim pesan
-    // ─────────────────────────────────────────────────────────────
 
     /**
      * Tunggu SELLER_GRACE_MS ms → cek seller → kalau belum balas, kirim AI reply.
@@ -166,10 +161,6 @@ public class AiAutoReply {
         }, SELLER_GRACE_MS, TimeUnit.MILLISECONDS);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // replyWithMenuSuggestion — dipanggil saat buyer klik kategori
-    // ─────────────────────────────────────────────────────────────
-
     /**
      * Kirim pesan AI ke Firestore saat buyer memilih kategori.
      * Seller akan melihat pesan ini di SellerWindow.
@@ -214,25 +205,6 @@ public class AiAutoReply {
         } catch (Exception ignored) {}
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // GOOGLE MAPS API KEY — isi di sini
-    // ─────────────────────────────────────────────────────────────
-
-    /**
-     * Isi dengan Google Maps Platform API key kamu.
-     * Aktifkan dua API di Google Cloud Console:
-     *   - Geocoding API
-     *   - Places API (Nearby Search)
-     *
-     * Cara dapat key:
-     *   1. https://console.cloud.google.com
-     *   2. APIs & Services -> Credentials -> Create API Key
-     *   3. Restrict ke: Geocoding API + Places API
-     *
-     * Kalau dikosongkan (""), app otomatis fallback ke:
-     *   - Nominatim OSM  (geocoding)
-     *   - Overpass API   (cari Indomaret)
-     */
     public static String GOOGLE_API_KEY = ""; // ISI API KEY DI SINI
 
     // ─────────────────────────────────────────────────────────────
@@ -274,8 +246,8 @@ public class AiAutoReply {
             URL url = new URL(urlStr);
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setRequestMethod("GET");
-            con.setConnectTimeout(10_000);
-            con.setReadTimeout(12_000);
+            con.setConnectTimeout(3_000);
+            con.setReadTimeout(5_000);
 
             if (con.getResponseCode() == 200) {
                 StringBuilder sb = new StringBuilder();
@@ -320,8 +292,8 @@ public class AiAutoReply {
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setRequestMethod("GET");
             con.setRequestProperty("User-Agent", "ToptriDesktopApp/1.0 (toptri@example.com)");
-            con.setConnectTimeout(10_000);
-            con.setReadTimeout(15_000);  // Nominatim bisa lambat dari Indonesia
+            con.setConnectTimeout(3_000);
+            con.setReadTimeout(5_000);
 
             int httpCode = con.getResponseCode();
             if (httpCode == 429) {
@@ -406,16 +378,6 @@ private static double[] guessCityCoords(String lcAddress) {
         return (int) Math.ceil(km / 5.0 * 60);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // OVERPASS API — cari Indomaret real di sekitar koordinat buyer
-    // ─────────────────────────────────────────────────────────────
-
-    /**
-     * Cari Indomaret nyata di sekitar koordinat buyer.
-     * Prioritas: Google Places Nearby Search API (jika GOOGLE_API_KEY terisi).
-     * Fallback: Overpass API / OpenStreetMap (gratis, tanpa key).
-     * Radius pencarian: 3 km. Max 5 hasil, diurutkan terdekat.
-     */
     public static List<IndomaretLocation> findNearbyIndomaret(double buyerLat, double buyerLng) {
         // Google Places Nearby Search
         if (!GOOGLE_API_KEY.isBlank()) {
@@ -445,7 +407,7 @@ private static double[] guessCityCoords(String lcAddress) {
             URL url = new URL(urlStr);
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setRequestMethod("GET");
-            con.setConnectTimeout(10_000);
+            con.setConnectTimeout(3_000);
             con.setReadTimeout(10_000);
 
             if (con.getResponseCode() != 200) return null;
@@ -545,12 +507,6 @@ private static double[] guessCityCoords(String lcAddress) {
         }
     }
 
-    /**
-     * Overpass API (OSM) — fallback kalau Google API key kosong / gagal.
-     * Coba radius 3 km dulu; kalau kosong, ulangi dengan 6 km.
-     * Timeout diperbesar agar tidak gagal dari koneksi Indonesia.
-     * Parse lon selalu dicari SETELAH lat (bukan dari awal elemen) agar tidak salah offset.
-     */
     private static List<IndomaretLocation> findNearbyIndomaretOverpass(double buyerLat, double buyerLng) {
         for (int radiusM : new int[]{3000, 6000}) {
             try {
@@ -566,8 +522,8 @@ private static double[] guessCityCoords(String lcAddress) {
                 HttpURLConnection con = (HttpURLConnection) url.openConnection();
                 con.setRequestMethod("GET");
                 con.setRequestProperty("User-Agent", "ToptriDesktopApp/1.0");
-                con.setConnectTimeout(15_000);
-                con.setReadTimeout(30_000); // Overpass bisa lambat dari Indonesia
+                con.setConnectTimeout(3_000);
+                con.setReadTimeout(6_000);
 
                 int httpCode = con.getResponseCode();
                 System.out.println("[OVERPASS] HTTP " + httpCode + " radius=" + radiusM +
@@ -685,6 +641,37 @@ private static double[] guessCityCoords(String lcAddress) {
         }
     }
 
+    /**
+     * Kirim pesan AI berisi pilihan metode pembayaran ke Firestore secara instan.
+     * Dipanggil dari background thread di BuyerWindow.onIndomaretPicked().
+     *
+     * @param requestId  ID request Firestore
+     * @param itemName   nama produk yang dipesan
+     * @param price      harga produk
+     * @param locName    nama Indomaret yang dipilih
+     * @param buyerName  nama buyer (bisa kosong)
+     * @param fs         FirestoreService
+     */
+    public static void sendPaymentMethodsMessage(
+            String requestId, String itemName, int price,
+            String locName, String buyerName, FirestoreService fs) {
+        try {
+            String nama = (buyerName == null || buyerName.isBlank()) ? "Kak" : buyerName;
+            String msg =
+                "🎉 Mantap, " + nama + "! Pesananmu sudah kami catat.\n\n" +
+                "📦 " + itemName + "  —  " + UiKit.rupiah(price) + "\n" +
+                "🏪 " + locName + "\n\n" +
+                "💳 Silakan pilih metode pembayaran:\n\n" +
+                "🔲 QRIS           — scan & bayar langsung di kasir\n" +
+                "🏦 Transfer Bank  — BCA / Mandiri / BRI / BNI\n" +
+                "💚 E-Wallet       — GoPay · OVO · Dana · ShopeePay\n" +
+                "💵 COD (Tunai)    — bayar saat pesanan tiba\n\n" +
+                "Ketuk salah satu tombol di bawah untuk lanjut ya! 👇";
+
+            fs.sendSellerMessage(requestId, "AI_BOT", "[AUTO] " + msg);
+        } catch (Exception ignored) {}
+    }
+
     // ─────────────────────────────────────────────────────────────
     // buildLocationReply — dipanggil setelah form delivery submit
     // ─────────────────────────────────────────────────────────────
@@ -773,8 +760,8 @@ private static double[] guessCityCoords(String lcAddress) {
         con.setRequestMethod("POST");
         con.setRequestProperty("Content-Type", "application/json");
         con.setDoOutput(true);
-        con.setConnectTimeout(5_000);
-        con.setReadTimeout(30_000);
+        con.setConnectTimeout(3_000);
+        con.setReadTimeout(6_000);
 
         try (OutputStream os = con.getOutputStream()) {
             os.write(body.toString().getBytes(StandardCharsets.UTF_8));

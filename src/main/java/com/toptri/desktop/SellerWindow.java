@@ -10,36 +10,14 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import javafx.scene.text.FontPosture;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class SellerWindow {
-
-    // ── Design tokens — dari UiKit ────────────────────────────────
-    private static final String COLOR_BG            = UiKit.COLOR_BG;
-    private static final String COLOR_SURFACE       = UiKit.COLOR_SURFACE;
-    private static final String COLOR_PRIMARY       = UiKit.COLOR_PRIMARY;
-    private static final String COLOR_PRIMARY_DARK  = UiKit.COLOR_PRIMARY_DARK;
-    private static final String COLOR_BUYER_BUBBLE  = UiKit.COLOR_BUYER_BUBBLE;
-    private static final String COLOR_SELLER_BUBBLE = UiKit.COLOR_SELLER_BUBBLE;
-    private static final String COLOR_OFFER_BUBBLE  = UiKit.COLOR_OFFER_BUBBLE;
-    private static final String COLOR_SIDEBAR_BG    = UiKit.COLOR_SIDEBAR_BG;
-    private static final String COLOR_SELECTED_ROW  = UiKit.COLOR_SELECTED_ROW;
-    private static final String COLOR_TEXT_MAIN     = UiKit.COLOR_TEXT_MAIN;
-    private static final String COLOR_TEXT_MUTED    = UiKit.COLOR_TEXT_MUTED;
-    private static final String COLOR_DIVIDER       = UiKit.COLOR_DIVIDER;
-    private static final String COLOR_SUCCESS       = UiKit.COLOR_SUCCESS;
-    private static final String COLOR_DANGER        = UiKit.COLOR_DANGER;
-    private static final String COLOR_WARN          = UiKit.COLOR_WARN;
-    private static final String COLOR_NOTIF_BG      = UiKit.COLOR_NOTIF_BG;
 
     // ── Services / state ─────────────────────────────────────────
     private final FirestoreService fs;
@@ -56,7 +34,6 @@ public class SellerWindow {
     private volatile String selectedBuyerText    = "";
     private volatile String latestBuyerMessageId = null;
     private volatile List<FirestoreService.OrderItem> latestOrderItems = new ArrayList<>();
-    private volatile boolean isRequestCompleted = false;
 
     private final Set<String> offeredKeys         = new HashSet<>();
     private int sentCountForThisRequest           = 0;
@@ -149,7 +126,7 @@ public class SellerWindow {
         BorderPane rootPane = new BorderPane();
         rootPane.setTop(appBar);
         rootPane.setCenter(body);
-        rootPane.setStyle("-fx-background-color: " + COLOR_BG + ";");
+        rootPane.setStyle("-fx-background-color: " + UiKit.COLOR_BG + ";");
 
         layered.getChildren().addAll(rootPane, toastContainer);
         StackPane.setAlignment(toastContainer, Pos.TOP_RIGHT);
@@ -171,10 +148,10 @@ public class SellerWindow {
     private HBox buildAppBar() {
         Label logo = new Label("🍱  Toptri Chat");
         logo.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 18));
-        logo.setStyle("-fx-text-fill: " + COLOR_PRIMARY + ";");
+        logo.setStyle("-fx-text-fill: " + UiKit.COLOR_PRIMARY + ";");
 
         Label role = new Label("Seller: " + sellerId);
-        role.setStyle("-fx-text-fill: " + COLOR_TEXT_MUTED + "; -fx-font-size: 13;");
+        role.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + "; -fx-font-size: 13;");
 
         styleStatusPill(statusPill, "neutral");
 
@@ -185,8 +162,8 @@ public class SellerWindow {
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(14, 20, 14, 20));
         bar.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 0 1 0;"
         );
         return bar;
@@ -197,10 +174,10 @@ public class SellerWindow {
     private VBox buildSidebar() {
         Label title = new Label("Inbox");
         title.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 15));
-        title.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        title.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
         inboxCountLabel.setStyle(
-            "-fx-background-color: " + COLOR_PRIMARY + ";" +
+            "-fx-background-color: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-text-fill: white; -fx-font-size: 11; -fx-font-weight: bold;" +
             "-fx-background-radius: 10; -fx-padding: 1 7;"
         );
@@ -219,14 +196,14 @@ public class SellerWindow {
         VBox.setVgrow(requestList, Priority.ALWAYS);
 
         Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: " + COLOR_DIVIDER + ";");
+        sep.setStyle("-fx-background-color: " + UiKit.COLOR_DIVIDER + ";");
 
         VBox sidebar = new VBox(0, sidebarHeader, sep, requestList);
         sidebar.setPrefWidth(270);
         sidebar.setMaxWidth(270);
         sidebar.setStyle(
-            "-fx-background-color: " + COLOR_SIDEBAR_BG + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SIDEBAR_BG + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 1 0 0;"
         );
         VBox.setVgrow(sidebar, Priority.ALWAYS);
@@ -238,11 +215,11 @@ public class SellerWindow {
     private VBox buildChatPanel() {
         Label chatTitle = new Label("💬  Percakapan");
         chatTitle.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 15));
-        chatTitle.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        chatTitle.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
         qtyBadge.setStyle(
             "-fx-background-color: #FEF3C7;" +
-            "-fx-text-fill: " + COLOR_WARN + ";" +
+            "-fx-text-fill: " + UiKit.COLOR_WARN + ";" +
             "-fx-font-size: 12; -fx-font-weight: bold;" +
             "-fx-background-radius: 6; -fx-padding: 2 8;"
         );
@@ -251,8 +228,8 @@ public class SellerWindow {
         chatTopBar.setAlignment(Pos.CENTER_LEFT);
         chatTopBar.setPadding(new Insets(14, 16, 10, 16));
         chatTopBar.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 0 1 0;"
         );
 
@@ -260,14 +237,14 @@ public class SellerWindow {
         chatBox.setFillWidth(true);
 
         chatScroll.setFitToWidth(true);
-        chatScroll.setStyle("-fx-background-color: " + COLOR_BG + "; -fx-background: " + COLOR_BG + ";");
+        chatScroll.setStyle("-fx-background-color: " + UiKit.COLOR_BG + "; -fx-background: " + UiKit.COLOR_BG + ";");
         chatScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         VBox.setVgrow(chatScroll, Priority.ALWAYS);
 
         chatReplyInput.setPromptText("Ketik pesan ke buyer...");
         chatReplyInput.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-radius: 20; -fx-background-radius: 20;" +
             "-fx-padding: 8 14; -fx-font-size: 13;"
         );
@@ -283,14 +260,14 @@ public class SellerWindow {
         replyBar.setAlignment(Pos.CENTER);
         replyBar.setPadding(new Insets(10, 16, 14, 16));
         replyBar.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 1 0 0 0;"
         );
 
         VBox panel = new VBox(0, chatTopBar, chatScroll, replyBar);
         VBox.setVgrow(chatScroll, Priority.ALWAYS);
-        panel.setStyle("-fx-background-color: " + COLOR_BG + ";");
+        panel.setStyle("-fx-background-color: " + UiKit.COLOR_BG + ";");
         return panel;
     }
 
@@ -299,20 +276,20 @@ public class SellerWindow {
     private VBox buildOfferPanel() {
         Label offerTitle = new Label("📦  Kirim Offer");
         offerTitle.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 15));
-        offerTitle.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        offerTitle.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
         HBox offerHeader = new HBox(offerTitle);
         offerHeader.setAlignment(Pos.CENTER_LEFT);
         offerHeader.setPadding(new Insets(14, 16, 10, 16));
         offerHeader.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 0 1 0;"
         );
 
         Label formLabel = new Label("Ketik manual:");
         formLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
-        formLabel.setStyle("-fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+        formLabel.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
 
         styleInput(mainInput,    "Nama menu / teks chat");
         styleInput(priceInput,   "Harga (kosong = chat)");
@@ -332,7 +309,7 @@ public class SellerWindow {
         contactInput.setOnAction(e -> onSendAuto());
 
         Label hint = new Label("💡  Kosong harga = chat  •  Isi harga = offer\n    Harga + Vendor = simpan menu baru");
-        hint.setStyle("-fx-text-fill: " + COLOR_TEXT_MUTED + "; -fx-font-size: 11;");
+        hint.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + "; -fx-font-size: 11;");
         hint.setWrapText(true);
 
         VBox formBox = new VBox(8,
@@ -342,16 +319,16 @@ public class SellerWindow {
         );
         formBox.setPadding(new Insets(12, 16, 12, 16));
         formBox.setStyle(
-            "-fx-background-color: " + COLOR_SURFACE + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_SURFACE + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 0 1 0;"
         );
 
         Label menuTitle = new Label("🍱  Menu (klik = kirim offer)");
         menuTitle.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 13));
-        menuTitle.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        menuTitle.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
-        menuCountLabel.setStyle("-fx-text-fill: " + COLOR_TEXT_MUTED + "; -fx-font-size: 12;");
+        menuCountLabel.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + "; -fx-font-size: 12;");
 
         HBox menuHeader = new HBox(8, menuTitle, menuCountLabel);
         menuHeader.setAlignment(Pos.CENTER_LEFT);
@@ -374,8 +351,8 @@ public class SellerWindow {
         panel.setPrefWidth(320);
         panel.setMaxWidth(340);
         panel.setStyle(
-            "-fx-background-color: " + COLOR_BG + ";" +
-            "-fx-border-color: " + COLOR_DIVIDER + ";" +
+            "-fx-background-color: " + UiKit.COLOR_BG + ";" +
+            "-fx-border-color: " + UiKit.COLOR_DIVIDER + ";" +
             "-fx-border-width: 0 0 0 1;"
         );
         return panel;
@@ -423,7 +400,7 @@ public class SellerWindow {
         VBox toast = new VBox(inner);
         toast.setMaxWidth(300);
         toast.setStyle(
-            "-fx-background-color: " + COLOR_NOTIF_BG + ";" +
+            "-fx-background-color: " + UiKit.COLOR_NOTIF_BG + ";" +
             "-fx-background-radius: 14;" +
             "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.40),18,0,0,6);" +
             "-fx-cursor: hand;"
@@ -530,135 +507,42 @@ public class SellerWindow {
 
     // ── BUBBLE BUILDERS ─────────────────────────────────────────
 
-    private HBox buildBuyerBubble(String text) {
-        Label avatar = new Label("🧑");
-        avatar.setStyle("-fx-font-size: 20;");
-
-        Label content = new Label(text);
-        content.setWrapText(true);
-        content.setMaxWidth(320);
-        content.setStyle(
-            "-fx-background-color: " + COLOR_BUYER_BUBBLE + ";" +
-            "-fx-background-radius: 16 16 16 4;" +   // kiri bawah datar (bubble kiri)
-            "-fx-padding: 10 14;" +
-            "-fx-font-size: 13;" +
-            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";"
-        );
-
-        Label time = new Label(now());
-        time.setStyle("-fx-font-size: 10; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
-
-        VBox bubble = new VBox(4, content, time);
-        bubble.setAlignment(Pos.TOP_LEFT);
-
-        // Avatar kiri, bubble kanan avatar → bubble di KIRI layar
-        HBox row = new HBox(10, avatar, bubble);
-        row.setAlignment(Pos.TOP_LEFT);
-        row.setPadding(new Insets(2, 60, 2, 0));
-        return row;
-    }
-
-    private HBox buildSellerBubble(String text) {
-        Label avatar = new Label("🏪");
-        avatar.setStyle("-fx-font-size: 20;");
-
-        Label content = new Label(text);
-        content.setWrapText(true);
-        content.setMaxWidth(320);
-        content.setStyle(
-            "-fx-background-color: " + COLOR_SELLER_BUBBLE + ";" +
-            "-fx-background-radius: 16 16 4 16;" +   // kanan bawah datar (bubble kanan)
-            "-fx-padding: 10 14;" +
-            "-fx-font-size: 13;" +
-            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";" +
-            "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.07),6,0,0,2);"
-        );
-
-        Label time = new Label(now());
-        time.setStyle("-fx-font-size: 10; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
-
-        VBox bubble = new VBox(4, content, time);
-        bubble.setAlignment(Pos.TOP_RIGHT);
-
-        // Bubble kiri avatar → bubble di KANAN layar
-        HBox row = new HBox(10, bubble, avatar);
-        row.setAlignment(Pos.TOP_RIGHT);
-        row.setPadding(new Insets(2, 0, 2, 60));
-        return row;
-    }
-
-    private HBox buildAiNotifBubble(String text) {
-        Label icon = new Label("🤖");
-        icon.setStyle("-fx-font-size: 16;");
-
-        Label content = new Label(text);
-        content.setWrapText(true);
-        content.setMaxWidth(340);
-        content.setStyle(
-            "-fx-font-size: 12; -fx-text-fill: #4338CA;" +
-            "-fx-font-style: italic;"
-        );
-
-        Label badge = new Label("AUTO · AI");
-        badge.setStyle(
-            "-fx-background-color: #EEF2FF;" +
-            "-fx-text-fill: #6366F1; -fx-font-size: 9; -fx-font-weight: bold;" +
-            "-fx-background-radius: 6; -fx-padding: 1 5;"
-        );
-
-        Label time = new Label(now());
-        time.setStyle("-fx-font-size: 10; -fx-text-fill: #A5B4FC;");
-
-        HBox topRow = new HBox(6, badge, time);
-        topRow.setAlignment(Pos.CENTER_LEFT);
-
-        VBox bubble = new VBox(3, topRow, content);
-        bubble.setPadding(new Insets(6 , 10, 6, 10));
-        bubble.setStyle(
-            "-fx-background-color: #EEF2FF;" +
-            "-fx-background-radius: 10;" +
-            "-fx-border-color: #C7D2FE;" +
-            "-fx-border-radius: 10; -fx-border-width: 1;"
-        );
-
-        HBox row = new HBox(6, icon, bubble);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(2, 40, 2, 4));
-        return row;
-    }
+    private HBox buildBuyerBubble(String text)    { return UiKit.buildBuyerBubble(text); }
+    private HBox buildSellerBubble(String text)   { return UiKit.buildSellerBubble(text); }
+    private HBox buildAiNotifBubble(String text)  { return UiKit.buildAiNotifBubble(text); }
 
     private HBox buildOfferBubble(SentOffer o) {
         Label header = new Label("📦  Offer dari " + (o.sellerId.equals(sellerId) ? "kamu" : o.sellerId));
         header.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 13));
-        header.setStyle("-fx-text-fill: " + COLOR_PRIMARY + ";");
+        header.setStyle("-fx-text-fill: " + UiKit.COLOR_PRIMARY + ";");
 
         VBox linesBox = new VBox(3);
         for (SentOffer.Line line : o.lines) {
             String lineText = line.name + "   " + line.qty + " × " +
                     rupiah(line.price) + "  =  " + rupiah(line.qty * line.price);  // GANTI
             Label ll = new Label(lineText);
-            ll.setStyle("-fx-font-size: 12; -fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+            ll.setStyle("-fx-font-size: 12; -fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
             linesBox.getChildren().add(ll);
         }
 
         Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: " + COLOR_DIVIDER + ";");
+        sep.setStyle("-fx-background-color: " + UiKit.COLOR_DIVIDER + ";");
 
         Label total = new Label("Total:  " + rupiah(o.grandTotal));  // GANTI
         total.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 14));
-        total.setStyle("-fx-text-fill: " + COLOR_SUCCESS + ";");
+        total.setStyle("-fx-text-fill: " + UiKit.COLOR_SUCCESS + ";");
 
         VBox card = new VBox(6, header, linesBox, sep, total);
         if (!o.vendor.isBlank()) {
             Label vendorLbl = new Label("🏷  " + o.vendor);
-            vendorLbl.setStyle("-fx-font-size: 11; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+            vendorLbl.setStyle("-fx-font-size: 11; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
             card.getChildren().add(vendorLbl);
         }
         card.setPadding(new Insets(12, 16, 12, 16));
         card.setStyle(
-            "-fx-background-color: " + COLOR_OFFER_BUBBLE + ";" +
+            "-fx-background-color: " + UiKit.COLOR_OFFER_BUBBLE + ";" +
             "-fx-background-radius: 12;" +
-            "-fx-border-color: " + COLOR_PRIMARY + ";" +
+            "-fx-border-color: " + UiKit.COLOR_PRIMARY + ";" +
             "-fx-border-width: 0 0 0 3;" +
             "-fx-border-radius: 0 0 0 2;"
         );
@@ -669,35 +553,9 @@ public class SellerWindow {
         return row;
     }
 
-    private HBox buildPendingBubble(String msg) {
-        Label l = new Label("⏳  " + msg);
-        l.setStyle(
-            "-fx-text-fill: " + COLOR_TEXT_MUTED + ";" +
-            "-fx-font-style: italic; -fx-font-size: 12;" +
-            "-fx-background-color: #F9FAFB;" +
-            "-fx-background-radius: 8; -fx-padding: 6 12;"
-        );
-        HBox row = new HBox(l);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(0, 60, 0, 46));
-        return row;
-    }
-
-    private Region chatDivider() {
-        Region r = new Region();
-        r.setMinHeight(6);
-        return r;
-    }
-
-    private VBox emptyChatHint(String msg) {
-        Label l = new Label(msg);
-        l.setStyle("-fx-font-size: 14; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
-        VBox box = new VBox(l);
-        box.setAlignment(Pos.CENTER);
-        box.setPadding(new Insets(60));
-        VBox.setVgrow(box, Priority.ALWAYS);
-        return box;
-    }
+    private HBox buildPendingBubble(String msg)   { return UiKit.buildPendingBubble(msg); }
+    private Region chatDivider()                   { return UiKit.chatDivider(); }
+    private VBox emptyChatHint(String msg)         { return UiKit.emptyChatHint(msg); }
 
     private String buildBuyerBubbleText(ChatMessage m) {
         if (m.orderItems == null || m.orderItems.size() <= 1) return m.text;
@@ -708,9 +566,7 @@ public class SellerWindow {
         return sb.toString().trim();
     }
 
-    private String now() {
-        return LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-    }
+    private String now() { return UiKit.now(); }
 
     // ============================================================
     // INNER CELL CLASSES
@@ -726,17 +582,17 @@ public class SellerWindow {
         InboxCell() {
             root.setPadding(new Insets(10, 14, 10, 14));
             title.setFont(Font.font("System", FontWeight.BOLD, 13));
-            title.setStyle("-fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+            title.setStyle("-fx-text-fill: " + UiKit.COLOR_TEXT_MAIN + ";");
 
             newBadge.setStyle(
-                "-fx-background-color: " + COLOR_DANGER + ";" +
+                "-fx-background-color: " + UiKit.COLOR_DANGER + ";" +
                 "-fx-text-fill: white; -fx-font-size: 9; -fx-font-weight: bold;" +
                 "-fx-background-radius: 6; -fx-padding: 1 5;"
             );
             newBadge.setVisible(false);
             newBadge.setManaged(false);
 
-            preview.setStyle("-fx-font-size: 11; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+            preview.setStyle("-fx-font-size: 11; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
             preview.setWrapText(false);
 
             topRow.setAlignment(Pos.CENTER_LEFT);
@@ -745,7 +601,7 @@ public class SellerWindow {
 
             setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
             setOnMouseEntered(e -> {
-                if (!isSelected()) root.setStyle("-fx-background-color: " + COLOR_BG + "; -fx-background-radius: 8;");
+                if (!isSelected()) root.setStyle("-fx-background-color: " + UiKit.COLOR_BG + "; -fx-background-radius: 8;");
             });
             setOnMouseExited(e -> {
                 if (!isSelected()) root.setStyle("-fx-background-color: transparent;");
@@ -771,16 +627,16 @@ public class SellerWindow {
 
             if (isSelected()) {
                 root.setStyle(
-                    "-fx-background-color: " + COLOR_SELECTED_ROW + ";" +
+                    "-fx-background-color: " + UiKit.COLOR_SELECTED_ROW + ";" +
                     "-fx-background-radius: 8;" +
-                    "-fx-border-color: " + COLOR_PRIMARY + ";" +
+                    "-fx-border-color: " + UiKit.COLOR_PRIMARY + ";" +
                     "-fx-border-width: 0 0 0 3;" +
                     "-fx-border-radius: 0;"
                 );
-                title.setStyle("-fx-text-fill: " + COLOR_PRIMARY + "; -fx-font-weight: bold;");
+                title.setStyle("-fx-text-fill: " + UiKit.COLOR_PRIMARY + "; -fx-font-weight: bold;");
             } else {
                 root.setStyle("-fx-background-color: transparent;");
-                title.setStyle("-fx-text-fill: " + (isNew ? COLOR_TEXT_MAIN : COLOR_TEXT_MAIN) + "; -fx-font-weight: bold;");
+                title.setStyle("-fx-text-fill: " + (isNew ? UiKit.COLOR_TEXT_MAIN : UiKit.COLOR_TEXT_MAIN) + "; -fx-font-weight: bold;");
             }
             setGraphic(root);
             setText(null);
@@ -808,16 +664,16 @@ public class SellerWindow {
 
             Label nameLabel = new Label(m.getName() + (alreadySent ? "  ✅" : ""));
             nameLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-            nameLabel.setStyle("-fx-text-fill: " + (alreadySent ? COLOR_TEXT_MUTED : COLOR_TEXT_MAIN) + ";");
+            nameLabel.setStyle("-fx-text-fill: " + (alreadySent ? UiKit.COLOR_TEXT_MUTED : UiKit.COLOR_TEXT_MAIN) + ";");
 
             Label subLabel = new Label(subtitle);
-            subLabel.setStyle("-fx-font-size: 11; -fx-text-fill: " + COLOR_TEXT_MUTED + ";");
+            subLabel.setStyle("-fx-font-size: 11; -fx-text-fill: " + UiKit.COLOR_TEXT_MUTED + ";");
             subLabel.setWrapText(true);
 
             Label badge = new Label(alreadySent ? "Terkirim" : "Kirim →");
             badge.setStyle(
-                "-fx-background-color: " + (alreadySent ? "#F3F4F6" : COLOR_PRIMARY) + ";" +
-                "-fx-text-fill: " + (alreadySent ? COLOR_TEXT_MUTED : "white") + ";" +
+                "-fx-background-color: " + (alreadySent ? "#F3F4F6" : UiKit.COLOR_PRIMARY) + ";" +
+                "-fx-text-fill: " + (alreadySent ? UiKit.COLOR_TEXT_MUTED : "white") + ";" +
                 "-fx-background-radius: 6; -fx-padding: 3 10; -fx-font-size: 11;"
             );
 
@@ -829,7 +685,7 @@ public class SellerWindow {
             card.setPadding(new Insets(10, 12, 10, 12));
             card.setMaxWidth(Double.MAX_VALUE);
             card.setStyle(
-                "-fx-background-color: " + (alreadySent ? "#FAFAFA" : COLOR_SURFACE) + ";" +
+                "-fx-background-color: " + (alreadySent ? "#FAFAFA" : UiKit.COLOR_SURFACE) + ";" +
                 "-fx-background-radius: 10;" +
                 "-fx-effect: dropshadow(gaussian,rgba(0,0,0,0.06),4,0,0,1);"
             );

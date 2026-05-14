@@ -146,18 +146,20 @@ public class FirestoreService {
         msg.put("text", t);
         msg.put("createdAt", Timestamp.now());
 
-        DocumentReference ref = db.collection("requests")
+        // fire-and-forget: kirim message tanpa nunggu konfirmasi server
+        ApiFuture<DocumentReference> refFuture = db.collection("requests")
                 .document(requestId)
                 .collection("messages")
-                .add(msg).get();
+                .add(msg);
 
         Map<String, Object> patch = new HashMap<>();
         patch.put("updatedAt", Timestamp.now());
         patch.put("buyerText", t);
         patch.put("latestBuyerText", t);
 
-        db.collection("requests").document(requestId).set(patch, SetOptions.merge()).get();
-        return ref;
+        // patch juga fire-and-forget
+        db.collection("requests").document(requestId).set(patch, SetOptions.merge());
+        return refFuture.get();
     }
 
     public void sendSellerMessage(String requestId, String sellerId, String text) throws Exception {
@@ -171,8 +173,9 @@ public class FirestoreService {
         msg.put("text", t);
         msg.put("createdAt", Timestamp.now());
 
-        db.collection("requests").document(requestId).collection("messages").add(msg).get();
-        db.collection("requests").document(requestId).update("updatedAt", Timestamp.now()).get();
+        // fire-and-forget: tidak .get() → langsung return tanpa tunggu roundtrip server
+        db.collection("requests").document(requestId).collection("messages").add(msg);
+        db.collection("requests").document(requestId).update("updatedAt", Timestamp.now());
     }
 
     // ============================================================
