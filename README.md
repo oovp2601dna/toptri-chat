@@ -1,53 +1,53 @@
 # 🏪 Indomaret Point — Toptri Chat (Desktop)
 
-Aplikasi chat real-time **Buyer–Seller** berbasis **JavaFX** dan **Firebase Firestore**, dirancang khusus untuk pemesanan produk Indomaret Point. Buyer mengirim request, AI langsung membalas dengan kategori produk, dan Seller menerima pesanan secara real-time.
+A real-time **Buyer–Seller** chat application built with **JavaFX** and **Firebase Firestore**, designed for Indomaret Point product ordering. Buyers send requests, AI instantly replies with product categories, and Sellers receive orders in real-time.
 
 ---
 
-## ✨ Fitur
+## ✨ Features
 
 ### 👤 Buyer Window
-- Kirim request pesanan via chat
-- **AI Auto-Reply** langsung menyambut buyer dengan greeting + video review toko
-- Pilih kategori produk: 😋 Yummy Choice · 🥐 Bakery · ☕ Coffee
-- Widget menu interaktif per kategori:
-  - **Yummy Choice**: Bapao (Rp8.000), Dimsum (Rp7.000), Sosis (Rp10.000)
-  - **Bakery**: Roti Asin (Rp5.000), Roti Manis (Rp6.000), Roti Daging (Rp8.000)
-  - **Coffee**: Latte (Rp15.000), Americano (Rp12.000), Squash (Rp10.000)
-- Form pengiriman (nama, HP, alamat)
-- **Peta Leaflet/OpenStreetMap** — tampil lokasi Indomaret terdekat dari alamat buyer
-  - Geocoding via Google Geocoding API (jika ada key) atau Nominatim OSM (fallback)
-  - Pencarian Indomaret via Google Places API atau Overpass API (fallback)
-- Pilih Indomaret → pesanan langsung dikonfirmasi
-- Sidebar riwayat semua request
-- Toast notifikasi saat pesanan selesai
-- Dapat membuka banyak request sekaligus
+- Send food/product requests via chat
+- **AI Auto-Reply** instantly greets the buyer with a welcome message + store review video
+- Choose product category: 😋 Yummy Choice · 🥐 Bakery · ☕ Coffee
+- Interactive menu widget per category:
+  - **Yummy Choice**: Bapao (Rp8,000), Dimsum (Rp7,000), Sosis (Rp10,000)
+  - **Bakery**: Plain Roll (Rp5,000), Sweet Roll (Rp6,000), Meat Roll (Rp8,000)
+  - **Coffee**: Latte (Rp15,000), Americano (Rp12,000), Squash (Rp10,000)
+- Delivery form (name, phone, address)
+- **Leaflet/OpenStreetMap map** — shows nearest Indomaret locations based on buyer's address
+  - Geocoding via Google Geocoding API (if key provided) or Nominatim OSM (fallback)
+  - Indomaret search via Google Places API or Overpass API (fallback)
+- Select an Indomaret → order is instantly confirmed
+- Sidebar showing all past requests
+- Toast notification when order is completed
+- Supports multiple concurrent requests
 
 ### 🧑‍🍳 Seller Window
-- Inbox real-time semua request buyer (status OPEN)
-- Toast notifikasi animasi slide-in saat request baru masuk
-- Tampilan chat dengan bubble buyer/seller/AI
-- Badge qty pesanan otomatis (contoh: 🛒 2× nasi · 3× es teh)
-- Kirim offer via:
-  - **Klik menu** dari daftar menu Firestore
-  - **Ketik manual** (nama + harga + vendor + kontak)
-  - **Tambah menu baru** ke Firestore + kirim offer sekaligus
-- Maksimal 3 offer per request
-- Multi-seller support (Seller A, Seller B, dst.)
+- Real-time inbox of all buyer requests (status: OPEN)
+- Animated slide-in toast notification for new incoming requests
+- Chat view with buyer / seller / AI message bubbles
+- Auto qty badge showing parsed order items (e.g. 🛒 2× nasi · 3× es teh)
+- Send offers via:
+  - **Click a menu item** from the Firestore menu list
+  - **Type manually** (name + price + vendor + contact)
+  - **Add a new menu** to Firestore + send the offer at the same time
+- Maximum 3 offers per request
+- Multi-seller support (Seller A, Seller B, etc.)
 
 ### 🤖 AI Auto-Reply (Ollama)
-- Menggunakan **Ollama** lokal dengan model **llama3.2**
-- Greeting otomatis saat buyer mengirim pesan pertama
-- Fallback statis jika Ollama tidak berjalan (app tetap jalan normal)
-- Mengirim notifikasi ke seller saat buyer memilih kategori
+- Uses local **Ollama** with model **llama3.2**
+- Automatically greets buyer on first message
+- Static fallback if Ollama is not running (app still works normally)
+- Notifies seller when buyer selects a product category
 
 ### 🔥 Firestore Backend
-| Collection | Isi |
+| Collection | Contents |
 |---|---|
-| `requests` | Semua request buyer (status, buyerId, text, dll.) |
-| `requests/{id}/messages` | Pesan chat buyer, seller, dan AI |
-| `requests/{id}/offers` | Offer dari seller (multi-item lines + grandTotal) |
-| `menus` | Daftar menu seller (nama, harga, vendor, kategori, rating) |
+| `requests` | All buyer requests (status, buyerId, text, etc.) |
+| `requests/{id}/messages` | Chat messages from buyer, seller, and AI |
+| `requests/{id}/offers` | Seller offers (multi-item lines + grandTotal) |
+| `menus` | Seller menu items (name, price, vendor, category, rating) |
 
 ---
 
@@ -65,21 +65,21 @@ Aplikasi chat real-time **Buyer–Seller** berbasis **JavaFX** dan **Firebase Fi
 
 ---
 
-## 📂 Struktur Project
+## 📂 Project Structure
 
 ```
 toptri-chat/
 │
 ├── src/main/java/com/toptri/desktop/
-│   ├── ToptriDesktopLauncher.java   # Entry point, launcher window
-│   ├── BuyerWindow.java             # UI & logika Buyer
-│   ├── SellerWindow.java            # UI & logika Seller
-│   ├── FirestoreService.java        # Semua operasi Firestore
-│   ├── AiAutoReply.java             # AI reply, geocoding, peta
-│   └── UiKit.java                   # Komponen UI & design tokens
+│   ├── ToptriDesktopLauncher.java   # Entry point & launcher window
+│   ├── BuyerWindow.java             # Buyer UI & logic
+│   ├── SellerWindow.java            # Seller UI & logic
+│   ├── FirestoreService.java        # All Firestore operations
+│   ├── AiAutoReply.java             # AI reply, geocoding & map logic
+│   └── UiKit.java                   # Shared UI components & design tokens
 │
 ├── src/main/resources/
-│   ├── firebase-service-account.json  # ⚠️ Tidak di-upload (ada di .gitignore)
+│   ├── firebase-service-account.json  # ⚠️ Not uploaded (listed in .gitignore)
 │   └── application.properties
 │
 ├── pom.xml
@@ -88,66 +88,66 @@ toptri-chat/
 
 ---
 
-## 🚀 Cara Menjalankan
+## 🚀 How to Run
 
-### 1. Clone project
+### 1. Clone the repository
 ```bash
 git clone https://github.com/oovp2601dna/toptri-chat.git
 cd toptri-chat
 ```
 
-### 2. Tambahkan Firebase Service Account
-Letakkan file key Firebase di:
+### 2. Add Firebase Service Account
+Place your Firebase key at:
 ```
 src/main/resources/firebase-service-account.json
 ```
-Download dari: **Firebase Console → Project Settings → Service Accounts → Generate new private key**
+Download from: **Firebase Console → Project Settings → Service Accounts → Generate new private key**
 
-### 3. (Opsional) Setup Ollama untuk AI
+### 3. (Optional) Set up Ollama for AI
 ```bash
 # Install Ollama: https://ollama.com
 ollama pull llama3.2
 ollama serve
 ```
-> Jika Ollama tidak dijalankan, app tetap berjalan dengan greeting fallback statis.
+> If Ollama is not running, the app still works with a static fallback greeting.
 
-### 4. (Opsional) Google Maps API Key
-Isi di `AiAutoReply.java`:
+### 4. (Optional) Google Maps API Key
+Set in `AiAutoReply.java`:
 ```java
 public static String GOOGLE_API_KEY = "ISI_API_KEY_DISINI";
 ```
-Tanpa key, peta tetap tampil menggunakan OpenStreetMap + Overpass API (gratis).
+Without a key, the map still works using OpenStreetMap + Overpass API (free).
 
-### 5. Jalankan app
+### 5. Run the app
 ```bash
 mvn javafx:run
 ```
 
 ---
 
-## 📖 Cara Penggunaan
+## 📖 How to Use
 
 ### Buyer
-1. Klik **Open Buyer** di launcher
-2. Ketik pesanan di kolom chat → klik **Kirim**
-3. AI akan menyambut dan menampilkan pilihan kategori
-4. Pilih kategori → pilih item menu
-5. Isi form pengiriman (nama, HP, alamat)
-6. Pilih Indomaret terdekat dari peta → pesanan dikonfirmasi ✅
+1. Click **Open Buyer** in the launcher
+2. Type your order in the chat field → click **Send**
+3. AI will greet you and show product category buttons
+4. Select a category → pick a menu item
+5. Fill in the delivery form (name, phone, address)
+6. Choose the nearest Indomaret from the map → order confirmed ✅
 
 ### Seller
-1. Klik **Open Seller A** atau **Open Seller B** di launcher
-2. Request buyer muncul otomatis di inbox kiri
-3. Klik request → lihat percakapan di tengah
-4. Kirim offer via klik menu (kanan) atau ketik manual
-5. Maksimal 3 offer per request
+1. Click **Open Seller A** or **Open Seller B** in the launcher
+2. Buyer requests appear automatically in the left inbox
+3. Click a request → view the conversation in the center panel
+4. Send an offer by clicking a menu item (right panel) or typing manually
+5. Maximum 3 offers per request
 
 ---
 
-## ⚙️ Konfigurasi
+## ⚙️ Configuration
 
-| File | Yang perlu diubah |
+| File | What to change |
 |---|---|
-| `AiAutoReply.java` | `GOOGLE_API_KEY`, `STORE_VIDEO_URL`, daftar menu, daftar lokasi Indomaret fallback |
+| `AiAutoReply.java` | `GOOGLE_API_KEY`, `STORE_VIDEO_URL`, menu list, fallback Indomaret locations |
 | `AiAutoReply.java` | `ollamaModel` (default: `llama3.2`) |
-| `firebase-service-account.json` | Kredensial Firebase project kamu |
+| `firebase-service-account.json` | Your Firebase project credentials |
